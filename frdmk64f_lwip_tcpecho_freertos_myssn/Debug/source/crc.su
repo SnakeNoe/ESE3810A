@@ -1,0 +1,3 @@
+../source/crc.c:25:6:InitCrc32	32	static
+../source/crc.c:40:6:Write_CRC	24	static
+../source/crc.c:45:10:Get_CRC	16	static
