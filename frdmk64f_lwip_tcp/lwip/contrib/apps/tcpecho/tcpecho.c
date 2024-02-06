@@ -75,7 +75,7 @@ tcpecho_thread(void *arg)
         do {
              netbuf_data(buf, &data, &len);
              PRINTF("Received: %s\r\n", data);
-             aescrc_test((uint8_t*) data);
+
              err = netconn_write(newconn, data, len, NETCONN_COPY);
 #if 0
             if (err != ERR_OK) {

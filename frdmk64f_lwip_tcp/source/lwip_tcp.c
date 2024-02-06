@@ -11,6 +11,8 @@
  * Includes
  ******************************************************************************/
 #include "lwip/opt.h"
+#include "lwip/sys.h"
+#include "lwip/api.h"
 
 #if LWIP_NETCONN
 
@@ -113,7 +115,7 @@
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-void aescrc_test(uint8_t* plaintext);
+void aescrc_test(void);
 
 /*******************************************************************************
  * Variables
@@ -165,8 +167,7 @@ static void stack_init(void *arg)
            ((u8_t *)&netif_gw)[2], ((u8_t *)&netif_gw)[3]);
     PRINTF("************************************************\r\n\n");
 
-    //aescrc_test();
-    tcpecho_init();
+    aescrc_test();
 
     vTaskDelete(NULL);
 }
@@ -198,24 +199,64 @@ int main(void)
 }
 #endif
 
-void aescrc_test(uint8_t* plaintext){
+void aescrc_test(void){
+	/* TCP data */
+	struct netconn *conn, *newconn;
+	err_t err;
+	/* AES data */
 	//uint8_t plaintext[] = {"01234567890123456789"};
 	uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
 	uint8_t iv[]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	uint8_t ciphertext[512] = {0};
 	size_t cipherLen;
+	/* CRC data */
 	uint32_t checkSum32;
 
-	PRINTF("Testing AES128\r\n");
-	cipherLen = AES_CBC_encrypt(plaintext, ciphertext, key, iv);
-	PRINTF("Ciphertext: ");
-	for(int i=0;i<cipherLen;i++){
-		PRINTF("0x%02x ", ciphertext[i]);
-	}
+	/* Create a new connection identifier. */
+	/* Bind connection to well known port number 7. */
+	#if LWIP_IPV6
+		conn = netconn_new(NETCONN_TCP_IPV6);
+		netconn_bind(conn, IP6_ADDR_ANY, 7);
+	#else /* LWIP_IPV6 */
+		conn = netconn_new(NETCONN_TCP);
+		netconn_bind(conn, IP_ADDR_ANY, 7);
+	#endif /* LWIP_IPV6 */
+		LWIP_ERROR("tcpecho: invalid conn", (conn != NULL), return;);
 
-	PRINTF("\r\nTesting CRC32\r\n");
-	InitCrc32(CRC0, 0xFFFFFFFFU);
-	Write_CRC(CRC0, ciphertext, cipherLen);
-	checkSum32 = Get_CRC(CRC0);
-	PRINTF("CRC-32: 0x%08x\r\n\n", checkSum32);
+	/* Tell connection to go into listening mode. */
+	netconn_listen(conn);
+
+	while(1){
+		/* Grab new connection. */
+		err = netconn_accept(conn, &newconn);
+		/*printf("accepted new connection %p\n", newconn);*/
+		/* Process the new connection. */
+		if (err == ERR_OK) {
+			struct netbuf *buf;
+		    void *data;
+		    u16_t len;
+		    uint8_t ciphertext[512] = {0};
+
+		    while ((err = netconn_recv(newconn, &buf)) == ERR_OK) {
+		        do {
+		        	netbuf_data(buf, &data, &len);
+		            PRINTF("Received: %s\r\n", data);
+
+		            /* Encrypt received data */
+		            cipherLen = AES_CBC_encrypt(data, ciphertext, key, iv);
+
+					/* Calculates CRC */
+					InitCrc32(CRC0, 0xFFFFFFFFU);
+					Write_CRC(CRC0, ciphertext, cipherLen);
+					checkSum32 = Get_CRC(CRC0);
+
+					/* Respond to the client */
+					err = netconn_write(newconn, &checkSum32, len, NETCONN_COPY);
+		        } while (netbuf_next(buf) >= 0);
+		        netbuf_delete(buf);
+		      }
+		      /* Close connection and discard connection identifier. */
+		      netconn_close(newconn);
+		      netconn_delete(newconn);
+		}
+	}
 }
