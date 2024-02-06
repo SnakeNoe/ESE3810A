@@ -243,6 +243,11 @@ void aescrc_test(void){
 
 		            /* Encrypt received data */
 		            cipherLen = AES_CBC_encrypt(data, ciphertext, key, iv);
+		            PRINTF("Encrypted Message: ");
+					for(int i=0; i<cipherLen; i++) {
+						PRINTF("0x%02x ", ciphertext[i]);
+					}
+					PRINTF("\r\n");
 
 					/* Calculates CRC */
 					InitCrc32(CRC0, 0xFFFFFFFFU);

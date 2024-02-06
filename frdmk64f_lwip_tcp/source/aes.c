@@ -527,7 +527,7 @@ void AES_CBC_decrypt_buffer(struct AES_ctx* ctx, uint8_t* buf,  uint32_t length)
 
 }
 
-size_t AES_CBC_encrypt(uint8_t plaintext[], uint8_t padded_msg[], uint8_t key[], uint8_t iv[]){
+size_t AES_CBC_encrypt(uint8_t *plaintext, uint8_t padded_msg[], uint8_t key[], uint8_t iv[]){
 	struct AES_ctx ctx;
 	size_t test_string_len, padded_len;
 
