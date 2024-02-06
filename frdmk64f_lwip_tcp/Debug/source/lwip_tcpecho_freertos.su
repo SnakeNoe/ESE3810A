@@ -1,0 +1,2 @@
+../source/lwip_tcpecho_freertos.c:130:13:stack_init	56	static
+../source/lwip_tcpecho_freertos.c:173:5:main	24	static
