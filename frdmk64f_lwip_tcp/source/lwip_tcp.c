@@ -10,6 +10,7 @@
 /*******************************************************************************
  * Includes
  ******************************************************************************/
+#include <stdio.h>
 #include "lwip/opt.h"
 #include "lwip/sys.h"
 #include "lwip/api.h"
@@ -36,6 +37,7 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
+#define CRC 4
 
 /* @TEST_ANCHOR */
 
@@ -116,6 +118,8 @@
  * Prototypes
  ******************************************************************************/
 void aescrc_test(void);
+//void bytes2Byte(uint32_t, uint8_t *);
+void decToHex(uint32_t, uint8_t *);
 
 /*******************************************************************************
  * Variables
@@ -235,6 +239,8 @@ void aescrc_test(void){
 		    void *data;
 		    u16_t len;
 		    uint8_t ciphertext[512] = {0};
+		    uint8_t transBuffer[512] = {0};
+		    uint8_t *crc;
 
 		    while ((err = netconn_recv(newconn, &buf)) == ERR_OK) {
 		        do {
@@ -243,19 +249,34 @@ void aescrc_test(void){
 
 		            /* Encrypt received data */
 		            cipherLen = AES_CBC_encrypt(data, ciphertext, key, iv);
-		            PRINTF("Encrypted Message: ");
-					for(int i=0; i<cipherLen; i++) {
-						PRINTF("0x%02x ", ciphertext[i]);
-					}
-					PRINTF("\r\n");
 
 					/* Calculates CRC */
 					InitCrc32(CRC0, 0xFFFFFFFFU);
 					Write_CRC(CRC0, ciphertext, cipherLen);
 					checkSum32 = Get_CRC(CRC0);
+					/* Adding CRC-32 to the end of ciphertext */
+					crc = (uint8_t*)&checkSum32;
+					for(int i=0;i<4;i++){
+						ciphertext[cipherLen+i] = *crc;
+						crc++;
+					}
+					/*PRINTF("Encrypted Message: ");
+					for(int i=0; i<cipherLen+CRC; i++) {
+						PRINTF("0x%02x ", ciphertext[i]);
+					}
+					PRINTF("\r\n\n");*/
 
-					/* Respond to the client */
-					err = netconn_write(newconn, &checkSum32, len, NETCONN_COPY);
+					/* Transform bytes (uint32_t) to byte (uint8_t) before transmit */
+					for(int i=0,j=0;i<cipherLen+CRC;i++){
+						decToHex(ciphertext[i], &transBuffer[j]);
+						//bytes2Byte(ciphertext[i], &transBuffer[j]);
+						j += 2;
+					}
+
+					/* Since encrypted data is of size uint32_t,
+					 * but to transmit they were converted to char, is double of length */
+					err = netconn_write(newconn, transBuffer, (cipherLen+CRC)*2, NETCONN_COPY);
+					//err = netconn_write(newconn, data, len, NETCONN_COPY);
 		        } while (netbuf_next(buf) >= 0);
 		        netbuf_delete(buf);
 		      }
@@ -264,4 +285,39 @@ void aescrc_test(void){
 		      netconn_delete(newconn);
 		}
 	}
+}
+
+/*void bytes2Byte(uint32_t bytes, uint8_t *byte){
+	uint16_t highMask = 0b11110000;
+	uint8_t lowMask = 0b1111;
+
+	*byte = (uint8_t)((bytes & highMask) >> 4);
+	byte++;
+	*byte = (uint8_t)(bytes & lowMask);
+}*/
+
+void decToHex(uint32_t decimal, uint8_t *result){
+	uint8_t hexadecimal[2];
+	uint32_t i = 0;
+
+    if(decimal){
+		while (decimal > 0){
+			uint32_t remainder = decimal % 16;
+			if (remainder < 10){
+				hexadecimal[i++] = remainder + '0';
+			}
+			else{
+				hexadecimal[i++] = remainder + 'A' - 10;
+			}
+			decimal /= 16;
+		}
+    }
+    else{
+    	hexadecimal[0] = 0;
+    	hexadecimal[1] = 0;
+    }
+
+    *result = hexadecimal[1];
+	result++;
+	*result = hexadecimal[0];
 }
