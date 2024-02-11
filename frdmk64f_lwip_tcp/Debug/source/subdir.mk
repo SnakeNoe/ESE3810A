@@ -7,19 +7,22 @@ C_SRCS += \
 ../source/aes.c \
 ../source/crc.c \
 ../source/lwip_tcp.c \
-../source/semihost_hardfault.c 
+../source/semihost_hardfault.c \
+../source/tcpip.c 
 
 C_DEPS += \
 ./source/aes.d \
 ./source/crc.d \
 ./source/lwip_tcp.d \
-./source/semihost_hardfault.d 
+./source/semihost_hardfault.d \
+./source/tcpip.d 
 
 OBJS += \
 ./source/aes.o \
 ./source/crc.o \
 ./source/lwip_tcp.o \
-./source/semihost_hardfault.o 
+./source/semihost_hardfault.o \
+./source/tcpip.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -34,7 +37,7 @@ source/%.o: ../source/%.c source/subdir.mk
 clean: clean-source
 
 clean-source:
-	-$(RM) ./source/aes.d ./source/aes.o ./source/crc.d ./source/crc.o ./source/lwip_tcp.d ./source/lwip_tcp.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o
+	-$(RM) ./source/aes.d ./source/aes.o ./source/crc.d ./source/crc.o ./source/lwip_tcp.d ./source/lwip_tcp.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/tcpip.d ./source/tcpip.o
 
 .PHONY: clean-source
 

@@ -8,7 +8,7 @@ from Crypto.Cipher import AES # For AES128
 ###############################################################################
 #                                   CONFIG
 ###############################################################################
-SERVER_PORT    = 7 # Port to accept client connections
+SERVER_PORT    = 10000 # Port to accept client connections
 SOCKET_TIMEOUT = 20 #seconds
 # AES 128 Encryption Key and Initialization Vector
 # See this Wikipedia's wiki on Block Cipher for details

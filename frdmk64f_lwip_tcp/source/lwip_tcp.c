@@ -212,6 +212,7 @@ void aescrc_test(void){
 	uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
 	uint8_t iv[]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	size_t cipherLen;
+	size_t decipherLen;
 	/* CRC data */
 	uint32_t checkSum32;
 
@@ -222,6 +223,7 @@ void aescrc_test(void){
 		netconn_bind(conn, IP6_ADDR_ANY, 7);
 	#else /* LWIP_IPV6 */
 		conn = netconn_new(NETCONN_TCP);
+		//netconn_bind(conn, IP_ADDR_ANY, 7);
 		netconn_bind(conn, IP_ADDR_ANY, 7);
 	#endif /* LWIP_IPV6 */
 		LWIP_ERROR("tcpecho: invalid conn", (conn != NULL), return;);
@@ -239,6 +241,7 @@ void aescrc_test(void){
 		    void *data;
 		    u16_t len;
 		    uint8_t ciphertext[512] = {0};
+		    uint8_t deciphertext[512] = {0};
 		    uint8_t transBuffer[512] = {0};
 		    uint8_t *crc;
 
@@ -249,11 +252,17 @@ void aescrc_test(void){
 
 		            /* Encrypt received data */
 		            cipherLen = AES_CBC_encrypt(data, ciphertext, key, iv);
-		            /*PRINTF("Encrypted Message: ");
+		            PRINTF("Encrypted Message: ");
 					for(int i=0; i<cipherLen; i++) {
 						PRINTF("0x%02x ", ciphertext[i]);
 					}
-					PRINTF("\r\n\n");*/
+					PRINTF("\r\n\n");
+					decipherLen = AES_CBC_decrypt(ciphertext, deciphertext, key, iv);
+					PRINTF("Decrypted Message: ");
+					for(int i=0; i<decipherLen; i++) {
+						PRINTF("%c ", deciphertext[i]);
+					}
+					PRINTF("\r\n\n");
 
 					/* Calculates CRC */
 					InitCrc32(CRC0, 0xFFFFFFFFU);
@@ -269,6 +278,8 @@ void aescrc_test(void){
 						ciphertext[cipherLen+i] = *crc;
 						crc--;
 					}
+					PRINTF("CRC-32: 0x%08x\r\n\n", checkSum32);
+
 					PRINTF("Transmitted: ");
 					for(int i=0; i<cipherLen+CRC; i++) {
 						PRINTF("0x%02x ", ciphertext[i]);
@@ -282,7 +293,7 @@ void aescrc_test(void){
 						j += 2;
 					}
 
-					/*PRINTF("Hex: ");
+					/*PRINTF("Transmitted in Hex: ");
 					for(int i=0; i<(cipherLen+CRC)*2; i++) {
 						PRINTF("0x%02x ", transBuffer[i]);
 					}
