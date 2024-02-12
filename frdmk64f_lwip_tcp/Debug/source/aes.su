@@ -17,6 +17,4 @@
 ../source/aes.c:490:13:XorWithIv	24	static
 ../source/aes.c:499:6:AES_CBC_encrypt_buffer	32	static
 ../source/aes.c:515:6:AES_CBC_decrypt_buffer	48	static
-../source/aes.c:530:8:AES_CBC_encrypt	224	static
-../source/aes.c:546:8:AES_CBC_decrypt	224	static
-../source/aes.c:569:6:AES_CTR_xcrypt_buffer	48	static
+../source/aes.c:537:6:AES_CTR_xcrypt_buffer	48	static

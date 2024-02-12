@@ -4,25 +4,19 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../source/aes.c \
-../source/crc.c \
+../source/aescrc.c \
 ../source/lwip_tcp.c \
-../source/semihost_hardfault.c \
-../source/tcpip.c 
+../source/semihost_hardfault.c 
 
 C_DEPS += \
-./source/aes.d \
-./source/crc.d \
+./source/aescrc.d \
 ./source/lwip_tcp.d \
-./source/semihost_hardfault.d \
-./source/tcpip.d 
+./source/semihost_hardfault.d 
 
 OBJS += \
-./source/aes.o \
-./source/crc.o \
+./source/aescrc.o \
 ./source/lwip_tcp.o \
-./source/semihost_hardfault.o \
-./source/tcpip.o 
+./source/semihost_hardfault.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -37,7 +31,7 @@ source/%.o: ../source/%.c source/subdir.mk
 clean: clean-source
 
 clean-source:
-	-$(RM) ./source/aes.d ./source/aes.o ./source/crc.d ./source/crc.o ./source/lwip_tcp.d ./source/lwip_tcp.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o ./source/tcpip.d ./source/tcpip.o
+	-$(RM) ./source/aescrc.d ./source/aescrc.o ./source/lwip_tcp.d ./source/lwip_tcp.o ./source/semihost_hardfault.d ./source/semihost_hardfault.o
 
 .PHONY: clean-source
 

@@ -527,38 +527,6 @@ void AES_CBC_decrypt_buffer(struct AES_ctx* ctx, uint8_t* buf,  uint32_t length)
 
 }
 
-size_t AES_CBC_encrypt(uint8_t *plaintext, uint8_t padded_msg[], uint8_t key[], uint8_t iv[]){
-	struct AES_ctx ctx;
-	size_t test_string_len, padded_len;
-
-	/* Init the AES context structure */
-	AES_init_ctx_iv(&ctx, key, iv);
-	/* To encrypt an array its lenght must be a multiple of 16 so we add zeros */
-	test_string_len = strlen(plaintext);
-	padded_len = test_string_len + (16 - (test_string_len%16) );
-	memcpy(padded_msg, plaintext, test_string_len);
-
-	AES_CBC_encrypt_buffer(&ctx, padded_msg, padded_len);
-
-	return padded_len;
-}
-
-size_t AES_CBC_decrypt(uint8_t *plaintext, uint8_t padded_msg[], uint8_t key[], uint8_t iv[]){
-	struct AES_ctx ctx;
-	size_t test_string_len, padded_len;
-
-	/* Init the AES context structure */
-	AES_init_ctx_iv(&ctx, key, iv);
-	/* To encrypt an array its lenght must be a multiple of 16 so we add zeros */
-	test_string_len = strlen(plaintext);
-	padded_len = test_string_len + (16 - (test_string_len%16) );
-	memcpy(padded_msg, plaintext, test_string_len);
-
-	AES_CBC_decrypt_buffer(&ctx, padded_msg, padded_len);
-
-	return padded_len;
-}
-
 #endif // #if defined(CBC) && (CBC == 1)
 
 
