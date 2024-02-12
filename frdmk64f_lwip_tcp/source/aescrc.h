@@ -17,5 +17,5 @@
 /* Private functions:                                                        */
 /*****************************************************************************/
 void InitCRC32(void);
-void SetAESCRC(uint8_t *plaintext, uint8_t padded_msg[]);
-void UnsetAESCRC(uint8_t *plaintext, uint8_t padded_msg[]);
+void Set_AESCRC(uint8_t *plaintext, uint8_t padded_msg[]);
+void Unset_AESCRC(uint8_t *plaintext, uint8_t padded_msg[]);

@@ -3,12 +3,9 @@ import socket
 PACKAGES = 8
 HOST = "192.168.0.102" # The server's IP address
 PORT = 7 # The port used by the server
-msg = [b"0", b"1", b"22", b"333", b"4444", b"55555", b"666666", b"7777777"]
+#msg = [b"0", b"1", b"22", b"333", b"4444", b"55555", b"666666", b"7777777"]
+msg = [b"\x889\xc1\xcb[a\xc2\xe1O\x89\xf3\x14\xdb\xcf:\x99}V\xbe\r"]
 data = []
-hex_data: int = []
-
-key = b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x00\x01\x02\x03\x04\x05\x06'
-iv = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
 for i in range(PACKAGES):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

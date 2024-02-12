@@ -218,8 +218,8 @@ void aescrc_test(void){
 		if(err == ERR_OK){
 			void *data;
 			u16_t len;
-			uint8_t ciphertext[512] = {0};
-			uint8_t deciphertext[512] = {0};
+			uint8_t cryptedText[512] = {0};
+			uint8_t decryptedText[512] = {0};
 			uint8_t transBuffer[512] = {0};
 
 		    while((err = netconn_recv(newconn, &buf)) == ERR_OK){
@@ -227,46 +227,38 @@ void aescrc_test(void){
 		    		netbuf_data(buf, &data, &len);
 		            PRINTF("Received: %s\r\n", data);
 
-		            //Encripting
-		            SetAESCRC(data, ciphertext);
-		            PRINTF("Encrypted Message: ");
+		            //Unset_AESCRC(cryptedText, decryptedText);
+
+		            //Encrypting
+		            Set_AESCRC(data, cryptedText);
+		            PRINTF("Encrypted message: ");
 					for(int i=0; i<20; i++) {
-						PRINTF("0x%02x ", ciphertext[i]);
+						PRINTF("0x%02x ", cryptedText[i]);
 					}
 					PRINTF("\r\n\n");
 
-					//Decrypting
-					UnsetAESCRC(ciphertext, deciphertext);
-					PRINTF("Decrypted Message: ");
+					//Deciphering
+					Unset_AESCRC(cryptedText, decryptedText);
+					PRINTF("Decrypted message: ");
 					for(int i=0; i<16; i++) {
-						PRINTF("%c ", deciphertext[i]);
-					}
-					PRINTF("\r\n\n");
-
-
-					PRINTF("Transmitted: ");
-					for(int i=0; i<16+CRC; i++) {
-						PRINTF("0x%02x ", ciphertext[i]);
+						PRINTF("%c", decryptedText[i]);
 					}
 					PRINTF("\r\n\n");
 
 					/* Transform bytes (uint32_t) to byte (uint8_t) before transmit */
 					for(int i=0,j=0;i<16+CRC;i++){
-						decToHex(ciphertext[i], &transBuffer[j]);
-						//bytes2Byte(ciphertext[i], &transBuffer[j]);
+						decToHex(cryptedText[i], &transBuffer[j]);
 						j += 2;
 					}
 
-					/*PRINTF("Transmitted in Hex: ");
-					for(int i=0; i<(cipherLen+CRC)*2; i++) {
+					PRINTF("After decToHex function: ");
+					for(int i=0; i<(16+CRC)*2; i++) {
 						PRINTF("0x%02x ", transBuffer[i]);
 					}
-					PRINTF("\r\n\n");*/
+					PRINTF("\r\n\n");
 
-					/* Since encrypted data is of size uint32_t,
-					 * but to transmit they were converted to char, is double of length */
-					err = netconn_write(newconn, transBuffer, (16+CRC)*2, NETCONN_COPY);
-					//err = netconn_write(newconn, ciphertext, cipherLen+CRC, NETCONN_COPY);
+					//err = netconn_write(newconn, transBuffer, (16+CRC)*2, NETCONN_COPY);
+					err = netconn_write(newconn, cryptedText, 16+CRC, NETCONN_COPY);
 		        }while (netbuf_next(buf) >= 0);
 		        netbuf_delete(buf);
 		    }
@@ -276,15 +268,6 @@ void aescrc_test(void){
 		}
 	}
 }
-
-/*void bytes2Byte(uint32_t bytes, uint8_t *byte){
-	uint16_t highMask = 0b11110000;
-	uint8_t lowMask = 0b1111;
-
-	*byte = (uint8_t)((bytes & highMask) >> 4);
-	byte++;
-	*byte = (uint8_t)(bytes & lowMask);
-}*/
 
 void decToHex(uint32_t decimal, uint8_t *result){
 	uint8_t hexadecimal[2];
