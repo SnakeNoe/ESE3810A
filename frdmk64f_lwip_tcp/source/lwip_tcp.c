@@ -218,46 +218,37 @@ void aescrc_test(void){
 		if(err == ERR_OK){
 			void *data;
 			u16_t len;
-			uint8_t cryptedText[512] = {0};
-			uint8_t decryptedText[512] = {0};
-			uint8_t transBuffer[512] = {0};
+			uint8_t cryptedText[1024] = {0};
+			uint8_t decryptedText[1024] = {0};
+			uint8_t demostrativeBuffer[1024] = {0};
 
 		    while((err = netconn_recv(newconn, &buf)) == ERR_OK){
 		    	do{
 		    		netbuf_data(buf, &data, &len);
-		            PRINTF("Received: %s\r\n", data);
 
-		            //Unset_AESCRC(cryptedText, decryptedText);
+		    		//Ensure to print valid characters to the console
+		    		uint8_t *temp = data;
+		    		PRINTF("Received: ");
+		    		for(int i=0;i<len;i++){
+		    			demostrativeBuffer[i] = *temp;
+		    			temp++;
+		    			PRINTF("%x", demostrativeBuffer[i]);
+		    		}
+		    		PRINTF("\r\n");
+		            InitCRC32();
 
-		            //Encrypting
-		            Set_AESCRC(data, cryptedText);
-		            PRINTF("Encrypted message: ");
-					for(int i=0; i<20; i++) {
-						PRINTF("0x%02x ", cryptedText[i]);
-					}
-					PRINTF("\r\n\n");
-
-					//Deciphering
-					Unset_AESCRC(cryptedText, decryptedText);
-					PRINTF("Decrypted message: ");
-					for(int i=0; i<16; i++) {
+		            //Decrypting
+		            Unset_AESCRC(data, decryptedText);
+		            PRINTF("Decrypted message: ");
+		            len = strlen(decryptedText);
+					for(int i=0; i<len; i++) {
 						PRINTF("%c", decryptedText[i]);
 					}
 					PRINTF("\r\n\n");
 
-					/* Transform bytes (uint32_t) to byte (uint8_t) before transmit */
-					for(int i=0,j=0;i<16+CRC;i++){
-						decToHex(cryptedText[i], &transBuffer[j]);
-						j += 2;
-					}
+		            //Encrypting
+		            Set_AESCRC(decryptedText, cryptedText);
 
-					PRINTF("After decToHex function: ");
-					for(int i=0; i<(16+CRC)*2; i++) {
-						PRINTF("0x%02x ", transBuffer[i]);
-					}
-					PRINTF("\r\n\n");
-
-					//err = netconn_write(newconn, transBuffer, (16+CRC)*2, NETCONN_COPY);
 					err = netconn_write(newconn, cryptedText, 16+CRC, NETCONN_COPY);
 		        }while (netbuf_next(buf) >= 0);
 		        netbuf_delete(buf);
@@ -269,6 +260,7 @@ void aescrc_test(void){
 	}
 }
 
+//Function with only demonstrative propurse (used to print in console non-printable characters
 void decToHex(uint32_t decimal, uint8_t *result){
 	uint8_t hexadecimal[2];
 	uint32_t i = 0;
