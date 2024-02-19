@@ -40,6 +40,12 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
+//To use driver.cloudmqtt.com broker otherwise, broker.hivemq.com
+#define CLOUD_MQTT
+
+#define TIME 30000000
+
+#define TOTAL_TOPICS 5
 
 /* @TEST_ANCHOR */
 
@@ -47,7 +53,7 @@
 #ifndef configMAC_ADDR
 #define configMAC_ADDR                     \
     {                                      \
-        0x02, 0x12, 0x13, 0x10, 0x15, 0x11 \
+        0x02, 0x12, 0x13, 0x10, 0x15, 0x03 \
     }
 #endif
 
@@ -64,25 +70,32 @@
 #define EXAMPLE_CLOCK_FREQ CLOCK_GetFreq(kCLOCK_CoreSysClk)
 
 /* GPIO pin configuration. */
-#define BOARD_LED_GPIO       BOARD_LED_RED_GPIO
-#define BOARD_LED_GPIO_PIN   BOARD_LED_RED_GPIO_PIN
+#define BOARD_LED_GPIO       BOARD_LED_GREEN_GPIO
+#define BOARD_LED_GPIO_PIN   BOARD_LED_GREEN_GPIO_PIN
 #define BOARD_SW_GPIO        BOARD_SW3_GPIO
 #define BOARD_SW_GPIO_PIN    BOARD_SW3_GPIO_PIN
 #define BOARD_SW_PORT        BOARD_SW3_PORT
 #define BOARD_SW_IRQ         BOARD_SW3_IRQ
 #define BOARD_SW_IRQ_HANDLER BOARD_SW3_IRQ_HANDLER
 
-
 #ifndef EXAMPLE_NETIF_INIT_FN
 /*! @brief Network interface initialization function. */
 #define EXAMPLE_NETIF_INIT_FN ethernetif0_init
 #endif /* EXAMPLE_NETIF_INIT_FN */
 
+#ifdef CLOUD_MQTT
+#define EXAMPLE_MQTT_SERVER_HOST "driver.cloudmqtt.com"
+#else
 /*! @brief MQTT server host name or IP address. */
 #define EXAMPLE_MQTT_SERVER_HOST "broker.hivemq.com"
+#endif
 
 /*! @brief MQTT server port number. */
+#ifdef CLOUD_MQTT
+#define EXAMPLE_MQTT_SERVER_PORT 18591
+#else
 #define EXAMPLE_MQTT_SERVER_PORT 1883
+#endif
 
 /*! @brief Stack size of the temporary lwIP initialization thread. */
 #define INIT_THREAD_STACKSIZE 1024
@@ -95,16 +108,25 @@
 
 /*! @brief Priority of the temporary initialization thread. */
 #define APP_THREAD_PRIO DEFAULT_THREAD_PRIO
-
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-
+void delay(uint32_t delay);
 static void connect_to_mqtt(void *ctx);
 
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+typedef struct{
+	uint8_t state;				//Subscriber: 0 = Off, 1 = On
+	uint16_t pollution;			//Publisher: 500ppm - 1500ppm
+	uint16_t pyranometer;		//Publisher: 0 W/m2 - 1800 W/m2
+	float pluviometer;			//Publisher: 0.1mm/h - 60mm/h
+	uint8_t anemometer;			//Publisher: 0 km/h - 180km/h; - 0 MPH - 112 MPH
+	uint8_t monitor;			//Subscriber: 0 = Monitor off, 1 = Monitor on
+	uint8_t anemometerUnit;		//Subscriber: 0 = km/h, 1 = MPH
+}topics;
+topics sTopics = {0, 500, 0, 0, 0, 0, 0};
 
 static mdio_handle_t mdioHandle = {.ops = &EXAMPLE_MDIO_OPS};
 static phy_handle_t phyHandle   = {.phyAddr = EXAMPLE_PHY_ADDRESS, .mdioHandle = &mdioHandle, .ops = &EXAMPLE_PHY_OPS};
@@ -118,8 +140,13 @@ static char client_id[40];
 /*! @brief MQTT client information. */
 static const struct mqtt_connect_client_info_t mqtt_client_info = {
     .client_id   = (const char *)&client_id[0],
-    .client_user = NULL,
-    .client_pass = NULL,
+#ifdef CLOUD_MQTT
+    .client_user = "noe_p2024",
+    .client_pass = "p2024",
+#else
+	.client_user = NULL,
+	.client_pass = NULL,
+#endif
     .keep_alive  = 100,
     .will_topic  = NULL,
     .will_msg    = NULL,
@@ -139,6 +166,12 @@ static volatile bool connected = false;
 /*******************************************************************************
  * Code
  ******************************************************************************/
+void delay(uint32_t delay){
+    volatile uint32_t i = delay;
+    for (;i>0;i--){
+        __asm("NOP"); /* delay */
+    }
+}
 
 /*!
  * @brief Called when subscription request finishes.
@@ -165,6 +198,7 @@ static void mqtt_incoming_publish_cb(void *arg, const char *topic, u32_t tot_len
     LWIP_UNUSED_ARG(arg);
 
     PRINTF("Received %u bytes from the topic \"%s\": \"", tot_len, topic);
+    PRINTF("Noe: %s", topic);
 }
 
 /*!
@@ -199,8 +233,8 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
  */
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
-    static const char *topics[] = {"lwip_topic/#", "lwip_other/#"};
-    int qos[]                   = {0, 1};
+    static const char *topics[] = {"noe_station/state", "noe_station/monitor", "noe_station/anemometerUnit"};
+    int qos[]                   = {0, 0, 0};
     err_t err;
     int i;
 
@@ -303,14 +337,18 @@ static void mqtt_message_published_cb(void *arg, err_t err)
  */
 static void publish_message(void *ctx)
 {
-    static const char *topic   = "lwip_topic/100";
-    static const char *message = "message from board";
+	static const char *topic[] = {"noe_station/feedbackState", "noe_station/sensors/pollution", "noe_station/sensors/pyranometer",
+							"noe_station/sensors/pluviometer", "noe_station/sensors/anemometer"};
+    static uint8_t currentTopic = 0;
 
-    LWIP_UNUSED_ARG(ctx);
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic[currentTopic]);
+    mqtt_publish(mqtt_client, topic[currentTopic], (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
 
-    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
-
-    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+    //Save the last topic
+    currentTopic++;
+    if(currentTopic == TOTAL_TOPICS){
+    	currentTopic = 0;
+    }
 }
 
 /*!
@@ -322,6 +360,7 @@ static void app_thread(void *arg)
     struct dhcp *dhcp;
     err_t err;
     int i;
+    char tempTopic[20];
 
     /* Wait for address from DHCP */
 
@@ -378,15 +417,22 @@ static void app_thread(void *arg)
     }
 
     /* Publish some messages */
-    for (i = 0; i < 5;)
+    for (i = 0; i < 1;)
     {
         if (connected)
         {
-            err = tcpip_callback(publish_message, NULL);
+        	sprintf(tempTopic, "%d", sTopics.state);
+            err = tcpip_callback(publish_message, tempTopic);
             if (err != ERR_OK)
             {
                 PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
             }
+            sprintf(tempTopic, "%d", sTopics.pollution);
+            err = tcpip_callback(publish_message, tempTopic);
+			if (err != ERR_OK)
+			{
+				PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+			}
             i++;
         }
 
@@ -474,12 +520,21 @@ static void stack_init(void *arg)
  */
 int main(void)
 {
+	/* Define the init structure for the output LED pin*/
+	gpio_pin_config_t led_config = {
+		kGPIO_DigitalOutput,
+		0,
+	};
+
     SYSMPU_Type *base = SYSMPU;
     BOARD_InitBootPins();
     BOARD_InitBootClocks();
     BOARD_InitDebugConsole();
     /* Disable SYSMPU. */
     base->CESR &= ~SYSMPU_CESR_VLD_MASK;
+
+    GPIO_PinInit(BOARD_LED_GPIO, BOARD_LED_GPIO_PIN, &led_config);
+	GPIO_PinWrite(BOARD_LED_GPIO, BOARD_LED_GPIO_PIN, 1U);
 
     /* Initialize lwIP from thread */
     if (sys_thread_new("main", stack_init, NULL, INIT_THREAD_STACKSIZE, INIT_THREAD_PRIO) == NULL)
