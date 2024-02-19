@@ -112,11 +112,17 @@
  * Prototypes
  ******************************************************************************/
 void delay(uint32_t delay);
+void stateFeedback(char state[]);
+void mock_getPollution(char pollution[]);
+void mock_getRadiation(char radiation[]);
+void mock_getPrecipitation(char precipitation[]);
+void mock_getWindSpeed(char speed[]);
 static void connect_to_mqtt(void *ctx);
 
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+uint8_t gIndex = 0;
 typedef struct{
 	uint8_t state;				//Subscriber: 0 = Off, 1 = On
 	uint16_t pollution;			//Publisher: 500ppm - 1500ppm
@@ -126,7 +132,7 @@ typedef struct{
 	uint8_t monitor;			//Subscriber: 0 = Monitor off, 1 = Monitor on
 	uint8_t anemometerUnit;		//Subscriber: 0 = km/h, 1 = MPH
 }topics;
-topics sTopics = {0, 500, 0, 0, 0, 0, 0};
+topics sTopics = {0};
 
 static mdio_handle_t mdioHandle = {.ops = &EXAMPLE_MDIO_OPS};
 static phy_handle_t phyHandle   = {.phyAddr = EXAMPLE_PHY_ADDRESS, .mdioHandle = &mdioHandle, .ops = &EXAMPLE_PHY_OPS};
@@ -171,6 +177,66 @@ void delay(uint32_t delay){
     for (;i>0;i--){
         __asm("NOP"); /* delay */
     }
+}
+
+/*!
+ * @brief Return the current state of this station
+ * @param state Array where stores current state (on/off) of this station converted to string ready to be transmitted by MQTT
+ */
+void stateFeedback(char state[]){
+	sprintf(state, "%d", sTopics.state);
+}
+
+/*!
+ * @brief Imitates a function that senses pollution
+ * @param pollution Array where stores pollution value converted to string ready to be transmitted by MQTT
+ */
+void mock_getPollution(char pollution[]){
+	static const uint16_t pseudorandomNumbers[5] = {600, 602, 578, 588, 610};
+
+	delay(8000000);
+	sTopics.pollution = pseudorandomNumbers[gIndex];
+
+	sprintf(pollution, "%d", sTopics.pollution);
+}
+
+/*!
+ * @brief Imitates a function that senses solar radiation
+ * @param radiation Array where stores radiation value converted to string ready to be transmitted by MQTT
+ */
+void mock_getRadiation(char radiation[]){
+	static const uint16_t pseudorandomNumbers[5] = {1000, 1002, 1001, 999, 1003};
+
+	delay(8000000);
+	sTopics.pyranometer = pseudorandomNumbers[gIndex];
+
+	sprintf(radiation, "%d", sTopics.pyranometer);
+}
+
+/*!
+ * @brief Imitates a function that senses precipitation
+ * @param precipitation Array where stores precipitation value converted to string ready to be transmitted by MQTT
+ */
+void mock_getPrecipitation(char precipitation[]){
+	static const float pseudorandomNumbers[5] = {1.1, 1.3, 1.5, 1.7, 1.9};
+
+	delay(8000000);
+	sTopics.pluviometer = pseudorandomNumbers[gIndex];
+
+	sprintf(precipitation, "%f", sTopics.pluviometer);
+}
+
+/*!
+ * @brief Imitates a function that senses wind speed
+ * @param speed Array where stores wind speed value converted to string ready to be transmitted by MQTT
+ */
+void mock_getWindSpeed(char speed[]){
+	static const uint8_t pseudorandomNumbers[5] = {40, 47, 33, 39, 41};
+
+	delay(8000000);
+	sTopics.anemometer = pseudorandomNumbers[gIndex];
+
+	sprintf(speed, "%d", sTopics.anemometer);
 }
 
 /*!
@@ -421,18 +487,21 @@ static void app_thread(void *arg)
     {
         if (connected)
         {
-        	sprintf(tempTopic, "%d", sTopics.state);
-            err = tcpip_callback(publish_message, tempTopic);
-            if (err != ERR_OK)
-            {
-                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-            }
-            sprintf(tempTopic, "%d", sTopics.pollution);
-            err = tcpip_callback(publish_message, tempTopic);
-			if (err != ERR_OK)
-			{
-				PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-			}
+        	/* State feedback */
+        	stateFeedback(tempTopic);
+			tcpip_callback(publish_message, tempTopic);
+			/* Pollution */
+			mock_getPollution(tempTopic);
+			tcpip_callback(publish_message, tempTopic);
+			/* Pyranometer */
+            mock_getRadiation(tempTopic);
+            tcpip_callback(publish_message, tempTopic);
+            /* Precipitation */
+			mock_getPrecipitation(tempTopic);
+			tcpip_callback(publish_message, tempTopic);
+			/* Anemometer */
+			mock_getWindSpeed(tempTopic);
+			tcpip_callback(publish_message, tempTopic);
             i++;
         }
 
