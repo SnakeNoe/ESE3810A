@@ -180,11 +180,12 @@ void delay(uint32_t delay){
 }
 
 /*!
- * @brief Return the current state of this station
- * @param state Array where stores current state (on/off) of this station converted to string ready to be transmitted by MQTT
+ * @brief Return state value integer to string
+ * @param feedback Array where stores state (on/off) converted to string ready to be transmitted by MQTT
  */
-void stateFeedback(char state[]){
-	sprintf(state, "%d", sTopics.state);
+void getStateFeedback(char feedback[]){
+	delay(8000000);
+	sprintf(feedback, "%d", sTopics.state);
 }
 
 /*!
@@ -198,6 +199,11 @@ void mock_getPollution(char pollution[]){
 	sTopics.pollution = pseudorandomNumbers[gIndex];
 
 	sprintf(pollution, "%d", sTopics.pollution);
+
+	//Subscribed topic: noe_station/monitor
+	if(sTopics.monitor){
+		PRINTF("CO: %s\r\n", pollution);
+	}
 }
 
 /*!
@@ -211,6 +217,11 @@ void mock_getRadiation(char radiation[]){
 	sTopics.pyranometer = pseudorandomNumbers[gIndex];
 
 	sprintf(radiation, "%d", sTopics.pyranometer);
+
+	//Subscribed topic: noe_station/monitor
+	if(sTopics.monitor){
+		PRINTF("Solar radiation: %s\r\n", radiation);
+	}
 }
 
 /*!
@@ -223,7 +234,12 @@ void mock_getPrecipitation(char precipitation[]){
 	delay(8000000);
 	sTopics.pluviometer = pseudorandomNumbers[gIndex];
 
-	sprintf(precipitation, "%f", sTopics.pluviometer);
+	sprintf(precipitation, "%.2f", sTopics.pluviometer);
+
+	//Subscribed topic: noe_station/monitor
+	if(sTopics.monitor){
+		PRINTF("Precipitation: %s\r\n", precipitation);
+	}
 }
 
 /*!
@@ -231,12 +247,33 @@ void mock_getPrecipitation(char precipitation[]){
  * @param speed Array where stores wind speed value converted to string ready to be transmitted by MQTT
  */
 void mock_getWindSpeed(char speed[]){
-	static const uint8_t pseudorandomNumbers[5] = {40, 47, 33, 39, 41};
+	static const uint8_t kilometers[5] = {40, 47, 33, 39, 41};
+	static const uint8_t miles[5] = {25, 26, 28, 19, 22};
 
 	delay(8000000);
-	sTopics.anemometer = pseudorandomNumbers[gIndex];
+	//Subscribed topic: noe_station/sensors/anemometer/anemometerUnit
+	if(!sTopics.anemometerUnit){
+		sTopics.anemometer = kilometers[gIndex];
+	}
+	else if(sTopics.anemometerUnit){
+		sTopics.anemometer = miles[gIndex];
+	}
+	else{
+		sTopics.anemometerUnit = 0;
+	}
 
 	sprintf(speed, "%d", sTopics.anemometer);
+
+	//Subscribed topic: noe_station/monitor
+	if(sTopics.monitor){
+		PRINTF("Wind speed: %s\r\n", speed);
+	}
+
+	//To change mock sensor values
+	gIndex++;
+	if(gIndex == TOTAL_TOPICS){
+		gIndex = 0;
+	}
 }
 
 /*!
@@ -264,7 +301,8 @@ static void mqtt_incoming_publish_cb(void *arg, const char *topic, u32_t tot_len
     LWIP_UNUSED_ARG(arg);
 
     PRINTF("Received %u bytes from the topic \"%s\": \"", tot_len, topic);
-    PRINTF("Noe: %s", topic);
+
+    sTopics.state = 1;
 }
 
 /*!
@@ -299,7 +337,7 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
  */
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
-    static const char *topics[] = {"noe_station/state", "noe_station/monitor", "noe_station/anemometerUnit"};
+    static const char *topics[] = {"noe_station/state/", "noe_station/monitor/", "noe_station/sensors/anemometer/unit/"};
     int qos[]                   = {0, 0, 0};
     err_t err;
     int i;
@@ -401,20 +439,44 @@ static void mqtt_message_published_cb(void *arg, err_t err)
 /*!
  * @brief Publishes a message. To be called on tcpip_thread.
  */
-static void publish_message(void *ctx)
+static void publish_feedback(void *ctx)
 {
-	static const char *topic[] = {"noe_station/feedbackState", "noe_station/sensors/pollution", "noe_station/sensors/pyranometer",
-							"noe_station/sensors/pluviometer", "noe_station/sensors/anemometer"};
-    static uint8_t currentTopic = 0;
+	static const char *topic = "noe_station/feedbackState";
 
-    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic[currentTopic]);
-    mqtt_publish(mqtt_client, topic[currentTopic], (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
 
-    //Save the last topic
-    currentTopic++;
-    if(currentTopic == TOTAL_TOPICS){
-    	currentTopic = 0;
-    }
+static void publish_pollution(void *ctx)
+{
+	static const char *topic = "noe_station/sensors/pollution";
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
+
+static void publish_pyranometer(void *ctx)
+{
+	static const char *topic = "noe_station/sensors/pyranometer";
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
+
+static void publish_pluviometer(void *ctx)
+{
+	static const char *topic = "noe_station/sensors/pluviometer";
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
+
+static void publish_anemometer(void *ctx)
+{
+	static const char *topic = "noe_station/sensors/anemometer";
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
 }
 
 /*!
@@ -426,7 +488,7 @@ static void app_thread(void *arg)
     struct dhcp *dhcp;
     err_t err;
     int i;
-    char tempTopic[20];
+    char publish[20];
 
     /* Wait for address from DHCP */
 
@@ -483,28 +545,31 @@ static void app_thread(void *arg)
     }
 
     /* Publish some messages */
-    for (i = 0; i < 1;)
+    for(i=0;i<5;)
     {
         if (connected)
         {
-        	/* State feedback */
-        	stateFeedback(tempTopic);
-			tcpip_callback(publish_message, tempTopic);
-			/* Pollution */
-			mock_getPollution(tempTopic);
-			tcpip_callback(publish_message, tempTopic);
-			/* Pyranometer */
-            mock_getRadiation(tempTopic);
-            tcpip_callback(publish_message, tempTopic);
-            /* Precipitation */
-			mock_getPrecipitation(tempTopic);
-			tcpip_callback(publish_message, tempTopic);
-			/* Anemometer */
-			mock_getWindSpeed(tempTopic);
-			tcpip_callback(publish_message, tempTopic);
-            i++;
-        }
+        	//State feedback
+        	getStateFeedback(publish);
+			tcpip_callback(publish_feedback, publish);
 
+			if(sTopics.state){
+				//Pollution
+				mock_getPollution(publish);
+				tcpip_callback(publish_pollution, publish);
+				//Pyranometer
+				mock_getRadiation(publish);
+				tcpip_callback(publish_pyranometer, publish);
+				//Precipitation
+				mock_getPrecipitation(publish);
+				tcpip_callback(publish_pluviometer, publish);
+				//Anemometer
+				mock_getWindSpeed(publish);
+				tcpip_callback(publish_anemometer, publish);
+				delay(35000000);
+				i++;
+			}
+        }
         sys_msleep(1000U);
     }
 
