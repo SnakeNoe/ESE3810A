@@ -45,7 +45,7 @@
 
 #define TIME 30000000
 
-#define TOTAL_TOPICS 5
+#define TOTAL_POSTS 5
 
 /* @TEST_ANCHOR */
 
@@ -122,6 +122,7 @@ static void connect_to_mqtt(void *ctx);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+bool gNewPost = false;
 uint8_t gIndex = 0;
 typedef struct{
 	uint8_t state;				//Subscriber: 0 = Off, 1 = On
@@ -133,6 +134,12 @@ typedef struct{
 	uint8_t anemometerUnit;		//Subscriber: 0 = km/h, 1 = MPH
 }topics;
 topics sTopics = {0};
+
+typedef struct{
+	char *topic;
+	char payload;
+}topicSubscribed;
+topicSubscribed sSubscribedInfo = {0};
 
 static mdio_handle_t mdioHandle = {.ops = &EXAMPLE_MDIO_OPS};
 static phy_handle_t phyHandle   = {.phyAddr = EXAMPLE_PHY_ADDRESS, .mdioHandle = &mdioHandle, .ops = &EXAMPLE_PHY_OPS};
@@ -172,11 +179,31 @@ static volatile bool connected = false;
 /*******************************************************************************
  * Code
  ******************************************************************************/
+void initStation(void){
+	sSubscribedInfo.topic = malloc(50);
+}
+
 void delay(uint32_t delay){
     volatile uint32_t i = delay;
     for (;i>0;i--){
         __asm("NOP"); /* delay */
     }
+}
+
+void extractSubscribedData(void){
+	if(!strcmp(sSubscribedInfo.topic, "noe_station/state/")){
+		sTopics.state = (uint8_t)sSubscribedInfo.payload - 48;
+	}
+	else if(!strcmp(sSubscribedInfo.topic, "noe_station/monitor/")){
+		sTopics.monitor = (uint8_t)sSubscribedInfo.payload - 48;
+	}
+	else if(!strcmp(sSubscribedInfo.topic, "noe_station/sensors/anemometer/unit/")){
+		sTopics.anemometerUnit = (uint8_t)sSubscribedInfo.payload - 48;
+	}
+	else{
+		PRINTF("ERROR: Topic [%s] not recognized!", sSubscribedInfo.topic);
+	}
+	gNewPost = false;
 }
 
 /*!
@@ -193,10 +220,10 @@ void getStateFeedback(char feedback[]){
  * @param pollution Array where stores pollution value converted to string ready to be transmitted by MQTT
  */
 void mock_getPollution(char pollution[]){
-	static const uint16_t pseudorandomNumbers[5] = {600, 602, 578, 588, 610};
+	static const uint16_t sensor[5] = {600, 602, 578, 588, 610};
 
 	delay(8000000);
-	sTopics.pollution = pseudorandomNumbers[gIndex];
+	sTopics.pollution = sensor[gIndex];
 
 	sprintf(pollution, "%d", sTopics.pollution);
 
@@ -211,10 +238,10 @@ void mock_getPollution(char pollution[]){
  * @param radiation Array where stores radiation value converted to string ready to be transmitted by MQTT
  */
 void mock_getRadiation(char radiation[]){
-	static const uint16_t pseudorandomNumbers[5] = {1000, 1002, 1001, 999, 1003};
+	static const uint16_t sensor[5] = {1000, 1002, 1001, 999, 1003};
 
 	delay(8000000);
-	sTopics.pyranometer = pseudorandomNumbers[gIndex];
+	sTopics.pyranometer = sensor[gIndex];
 
 	sprintf(radiation, "%d", sTopics.pyranometer);
 
@@ -229,10 +256,10 @@ void mock_getRadiation(char radiation[]){
  * @param precipitation Array where stores precipitation value converted to string ready to be transmitted by MQTT
  */
 void mock_getPrecipitation(char precipitation[]){
-	static const float pseudorandomNumbers[5] = {1.1, 1.3, 1.5, 1.7, 1.9};
+	static const float sensor[5] = {1.1, 1.3, 1.5, 1.7, 1.9};
 
 	delay(8000000);
-	sTopics.pluviometer = pseudorandomNumbers[gIndex];
+	sTopics.pluviometer = sensor[gIndex];
 
 	sprintf(precipitation, "%.2f", sTopics.pluviometer);
 
@@ -271,7 +298,7 @@ void mock_getWindSpeed(char speed[]){
 
 	//To change mock sensor values
 	gIndex++;
-	if(gIndex == TOTAL_TOPICS){
+	if(gIndex == TOTAL_POSTS){
 		gIndex = 0;
 	}
 }
@@ -302,7 +329,7 @@ static void mqtt_incoming_publish_cb(void *arg, const char *topic, u32_t tot_len
 
     PRINTF("Received %u bytes from the topic \"%s\": \"", tot_len, topic);
 
-    sTopics.state = 1;
+    memcpy(sSubscribedInfo.topic, topic, strlen(topic)+1);
 }
 
 /*!
@@ -325,6 +352,9 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
             PRINTF("\\x%02x", data[i]);
         }
     }
+
+    memcpy(&sSubscribedInfo.payload, data, len);
+    gNewPost = true;
 
     if (flags & MQTT_DATA_FLAG_LAST)
     {
@@ -443,6 +473,8 @@ static void publish_feedback(void *ctx)
 {
 	static const char *topic = "noe_station/feedbackState";
 
+	LWIP_UNUSED_ARG(ctx);
+
     PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
     mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
 }
@@ -450,6 +482,8 @@ static void publish_feedback(void *ctx)
 static void publish_pollution(void *ctx)
 {
 	static const char *topic = "noe_station/sensors/pollution";
+
+	LWIP_UNUSED_ARG(ctx);
 
     PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
     mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
@@ -459,6 +493,8 @@ static void publish_pyranometer(void *ctx)
 {
 	static const char *topic = "noe_station/sensors/pyranometer";
 
+	LWIP_UNUSED_ARG(ctx);
+
     PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
     mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
 }
@@ -467,6 +503,8 @@ static void publish_pluviometer(void *ctx)
 {
 	static const char *topic = "noe_station/sensors/pluviometer";
 
+	LWIP_UNUSED_ARG(ctx);
+
     PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
     mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
 }
@@ -474,6 +512,8 @@ static void publish_pluviometer(void *ctx)
 static void publish_anemometer(void *ctx)
 {
 	static const char *topic = "noe_station/sensors/anemometer";
+
+	LWIP_UNUSED_ARG(ctx);
 
     PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
     mqtt_publish(mqtt_client, topic, (char *)ctx, strlen((char *)ctx), 1, 0, mqtt_message_published_cb, (void *)topic);
@@ -491,6 +531,7 @@ static void app_thread(void *arg)
     char publish[20];
 
     /* Wait for address from DHCP */
+    initStation();
 
     PRINTF("Getting IP address from DHCP...\r\n");
 
@@ -549,6 +590,9 @@ static void app_thread(void *arg)
     {
         if (connected)
         {
+        	if(gNewPost){
+        		extractSubscribedData();
+        	}
         	//State feedback
         	getStateFeedback(publish);
 			tcpip_callback(publish_feedback, publish);
@@ -566,13 +610,14 @@ static void app_thread(void *arg)
 				//Anemometer
 				mock_getWindSpeed(publish);
 				tcpip_callback(publish_anemometer, publish);
-				delay(35000000);
+				delay(TIME);
 				i++;
 			}
         }
         sys_msleep(1000U);
     }
 
+    free(sSubscribedInfo.topic);
     vTaskDelete(NULL);
 }
 
