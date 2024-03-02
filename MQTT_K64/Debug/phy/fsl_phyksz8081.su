@@ -1,6 +1,6 @@
-C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\MQTT_K64\mdio/fsl_mdio.h:85:20:MDIO_Init	16	static
-C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\MQTT_K64\mdio/fsl_mdio.h:101:24:MDIO_Write	32	static
-C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\MQTT_K64\mdio/fsl_mdio.h:117:24:MDIO_Read	32	static
+C:\ESE3810A_Noe_Ortiz\MQTT_K64\mdio/fsl_mdio.h:85:20:MDIO_Init	16	static
+C:\ESE3810A_Noe_Ortiz\MQTT_K64\mdio/fsl_mdio.h:101:24:MDIO_Write	32	static
+C:\ESE3810A_Noe_Ortiz\MQTT_K64\mdio/fsl_mdio.h:117:24:MDIO_Read	32	static
 ../phy/fsl_phyksz8081.c:56:10:PHY_KSZ8081_Init	32	static
 ../phy/fsl_phyksz8081.c:140:10:PHY_KSZ8081_Write	24	static
 ../phy/fsl_phyksz8081.c:145:10:PHY_KSZ8081_Read	24	static
