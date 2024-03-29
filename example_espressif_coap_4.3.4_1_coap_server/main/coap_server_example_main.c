@@ -348,6 +348,7 @@ hnd_state_put(coap_resource_t *resource,
         state_data_len = size > sizeof (state_data) ? sizeof (state_data) : size;
         memcpy(state_data, data, state_data_len);
     }
+    g_state = atoi(state_data);
 }
 
 static void
