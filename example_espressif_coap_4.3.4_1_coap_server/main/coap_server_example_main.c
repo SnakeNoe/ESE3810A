@@ -61,6 +61,9 @@
 
 const static char *TAG = "CoAP server";
 
+uint8_t g_state = 0;
+uint8_t g_index = 0;
+uint8_t g_unit = 0;
 static char espressif_data[100];
 static int espressif_data_len = 0;
 //Gets
@@ -80,7 +83,7 @@ static int state_data_len = 0;
 static char monitor_data[100];
 static int monitor_data_len = 0;
 static char anemometer_unit_data[100];
-static int anemometer_unir_data_len = 0;
+static int anemometer_unit_data_len = 0;
 
 #ifdef CONFIG_COAP_MBEDTLS_PKI
 /* CA cert, taken from coap_ca.pem
@@ -108,8 +111,48 @@ extern uint8_t oscore_conf_start[] asm("_binary_coap_oscore_conf_start");
 extern uint8_t oscore_conf_end[]   asm("_binary_coap_oscore_conf_end");
 #endif /* CONFIG_COAP_OSCORE_SUPPORT */
 
-#define INITIAL_DATA "Hello Noe!"
-#define FEEDBACK_DATA "Noe"
+#define INITIAL_DATA "Hello World!"
+
+void get_next_index(void){
+    g_index++;
+    if(g_index>4){
+        g_index = 0;
+    }
+}
+
+void mock_get_pollution(char pollution[], uint8_t index){
+    uint16_t data[5] = {1000, 1100, 1200, 1300, 1400};
+
+    sprintf(pollution, "%d", data[index]);
+    get_next_index();
+}
+
+void mock_get_radiation(char radiation[], uint8_t index){
+    uint16_t data[5] = {2000, 2100, 2200, 2300, 2400};
+
+    sprintf(radiation, "%d", data[index]);
+    get_next_index();
+}
+
+void mock_get_precipitation(char precipitation[], uint8_t index){
+    uint16_t data[5] = {1.0, 1.1, 1.2, 1.3, 1.4};
+
+    sprintf(precipitation, "%d", data[index]);
+    get_next_index();
+}
+
+void mock_get_wind_speed(char wind_speed[], uint8_t index){
+    uint16_t km[5] = {50, 60, 70, 80, 90};
+    uint16_t m[5] = {25, 26, 27, 28, 29};
+
+    if(g_unit){
+        sprintf(wind_speed, "%d", m[index]);
+    }
+    else{
+        sprintf(wind_speed, "%d", km[index]);
+    }
+    get_next_index();
+}
 
 /*
  * The resource handler
@@ -181,12 +224,187 @@ hnd_feedback_get(coap_resource_t *resource,
                   const coap_string_t *query,
                   coap_pdu_t *response)
 {
+    char feedback_str[6];
+
+    sprintf(feedback_str, "%d", g_state);
+    snprintf(feedback_data, sizeof(feedback_data), feedback_str);
+    feedback_data_len = strlen(feedback_data);
+
     coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
     coap_add_data_large_response(resource, session, request, response,
                                  query, COAP_MEDIATYPE_TEXT_PLAIN, 60, 0,
                                  (size_t)feedback_data_len,
                                  (const u_char *)feedback_data,
                                  NULL, NULL);
+}
+
+static void
+hnd_pollution_get(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    char pollution_str[6];
+    
+    mock_get_pollution(pollution_str, g_index);
+    snprintf(pollution_data, sizeof(pollution_data), pollution_str);
+    pollution_data_len = strlen(pollution_data);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
+    coap_add_data_large_response(resource, session, request, response,
+                                 query, COAP_MEDIATYPE_TEXT_PLAIN, 60, 0,
+                                 (size_t)pollution_data_len,
+                                 (const u_char *)pollution_data,
+                                 NULL, NULL);
+}
+
+static void
+hnd_radiation_get(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    char radiation_str[6];
+
+    mock_get_radiation(radiation_str, g_index);
+    snprintf(radiation_data, sizeof(radiation_data), radiation_str);
+    radiation_data_len = strlen(radiation_data);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
+    coap_add_data_large_response(resource, session, request, response,
+                                 query, COAP_MEDIATYPE_TEXT_PLAIN, 60, 0,
+                                 (size_t)radiation_data_len,
+                                 (const u_char *)radiation_data,
+                                 NULL, NULL);
+}
+
+static void
+hnd_precipitation_get(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    char precipitation_str[6];
+
+    mock_get_precipitation(precipitation_str, g_index);
+    snprintf(precipitation_data, sizeof(precipitation_data), precipitation_str);
+    precipitation_data_len = strlen(precipitation_data);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
+    coap_add_data_large_response(resource, session, request, response,
+                                 query, COAP_MEDIATYPE_TEXT_PLAIN, 60, 0,
+                                 (size_t)precipitation_data_len,
+                                 (const u_char *)precipitation_data,
+                                 NULL, NULL);
+}
+
+static void
+hnd_wind_speed_get(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    char wind_speed_str[4];
+
+    mock_get_wind_speed(wind_speed_str, g_index);
+    snprintf(wind_speed_data, sizeof(wind_speed_data), wind_speed_str);
+    wind_speed_data_len = strlen(wind_speed_data);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CONTENT);
+    coap_add_data_large_response(resource, session, request, response,
+                                 query, COAP_MEDIATYPE_TEXT_PLAIN, 60, 0,
+                                 (size_t)wind_speed_data_len,
+                                 (const u_char *)wind_speed_data,
+                                 NULL, NULL);
+}
+
+static void
+hnd_state_put(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    size_t size;
+    size_t offset;
+    size_t total;
+    const unsigned char *data;
+
+    coap_resource_notify_observers(resource, NULL);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CHANGED);
+
+    /* coap_get_data_large() sets size to 0 on error */
+    (void)coap_get_data_large(request, &size, &data, &offset, &total);
+
+    if (size == 0) {      /* re-init */
+        snprintf(state_data, sizeof(state_data), "0");
+        state_data_len = strlen(state_data);
+    } else {
+        state_data_len = size > sizeof (state_data) ? sizeof (state_data) : size;
+        memcpy(state_data, data, state_data_len);
+    }
+}
+
+static void
+hnd_monitor_put(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    size_t size;
+    size_t offset;
+    size_t total;
+    const unsigned char *data;
+
+    coap_resource_notify_observers(resource, NULL);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CHANGED);
+
+    /* coap_get_data_large() sets size to 0 on error */
+    (void)coap_get_data_large(request, &size, &data, &offset, &total);
+
+    if (size == 0) {      /* re-init */
+        snprintf(monitor_data, sizeof(monitor_data), "0");
+        monitor_data_len = strlen(monitor_data);
+    } else {
+        monitor_data_len = size > sizeof (monitor_data) ? sizeof (monitor_data) : size;
+        memcpy(monitor_data, data, monitor_data_len);
+    }
+}
+
+static void
+hnd_anemometer_unit_put(coap_resource_t *resource,
+                  coap_session_t *session,
+                  const coap_pdu_t *request,
+                  const coap_string_t *query,
+                  coap_pdu_t *response)
+{
+    size_t size;
+    size_t offset;
+    size_t total;
+    const unsigned char *data;
+
+    coap_resource_notify_observers(resource, NULL);
+
+    coap_pdu_set_code(response, COAP_RESPONSE_CODE_CHANGED);
+
+    /* coap_get_data_large() sets size to 0 on error */
+    (void)coap_get_data_large(request, &size, &data, &offset, &total);
+
+    if (size == 0) {      /* re-init */
+        snprintf(anemometer_unit_data, sizeof(anemometer_unit_data), "0");
+        anemometer_unit_data_len = strlen(anemometer_unit_data);
+    } else {
+        anemometer_unit_data_len = size > sizeof (anemometer_unit_data) ? sizeof (anemometer_unit_data) : size;
+        memcpy(anemometer_unit_data, data, anemometer_unit_data_len);
+    }
+    g_unit = atoi(anemometer_unit_data);
 }
 
 #ifdef CONFIG_COAP_OSCORE_SUPPORT
@@ -245,6 +463,13 @@ static void coap_example_server(void *p)
     coap_context_t *ctx = NULL;
     coap_resource_t *resource_Espressif = NULL;
     coap_resource_t *resource_feedback = NULL;
+    coap_resource_t *resource_pollution = NULL;
+    coap_resource_t *resource_radiation = NULL;
+    coap_resource_t *resource_precipitation = NULL;
+    coap_resource_t *resource_wind_speed = NULL;
+    coap_resource_t *resource_state = NULL;
+    coap_resource_t *resource_monitor = NULL;
+    coap_resource_t *resource_anemometer_unit = NULL;
     int have_ep = 0;
     uint16_t u_s_port = atoi(CONFIG_EXAMPLE_COAP_LISTEN_PORT);
 #ifdef CONFIG_EXAMPLE_COAPS_LISTEN_PORT
@@ -275,8 +500,6 @@ static void coap_example_server(void *p)
 
     snprintf(espressif_data, sizeof(espressif_data), INITIAL_DATA);
     espressif_data_len = strlen(espressif_data);
-    snprintf(feedback_data, sizeof(feedback_data), "Hola feedback");
-    feedback_data_len = strlen(feedback_data);
     coap_set_log_handler(coap_log_handler);
     coap_set_log_level(EXAMPLE_COAP_LOG_DEFAULT_LEVEL);
 
@@ -415,15 +638,71 @@ static void coap_example_server(void *p)
             ESP_LOGE(TAG, "coap_resource_init() failed");
             goto clean_up;
         }
+        resource_pollution = coap_resource_init(coap_make_str_const("pollution"), 0);
+        if (!resource_pollution) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
+        resource_radiation = coap_resource_init(coap_make_str_const("radiation"), 0);
+        if (!resource_radiation) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
+        resource_precipitation = coap_resource_init(coap_make_str_const("precipitation"), 0);
+        if (!resource_precipitation) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
+        resource_wind_speed = coap_resource_init(coap_make_str_const("wind_speed"), 0);
+        if (!resource_wind_speed) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
+        resource_state = coap_resource_init(coap_make_str_const("state"), 0);
+        if (!resource_state) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
+        resource_monitor = coap_resource_init(coap_make_str_const("monitor"), 0);
+        if (!resource_monitor) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
+        resource_anemometer_unit = coap_resource_init(coap_make_str_const("anemometer_unit"), 0);
+        if (!resource_anemometer_unit) {
+            ESP_LOGE(TAG, "coap_resource_init() failed");
+            goto clean_up;
+        }
         coap_register_handler(resource_Espressif, COAP_REQUEST_GET, hnd_espressif_get);
         coap_register_handler(resource_Espressif, COAP_REQUEST_PUT, hnd_espressif_put);
         coap_register_handler(resource_Espressif, COAP_REQUEST_DELETE, hnd_espressif_delete);
         coap_register_handler(resource_feedback, COAP_REQUEST_GET, hnd_feedback_get);
+        coap_register_handler(resource_pollution, COAP_REQUEST_GET, hnd_pollution_get);
+        coap_register_handler(resource_radiation, COAP_REQUEST_GET, hnd_radiation_get);
+        coap_register_handler(resource_precipitation, COAP_REQUEST_GET, hnd_precipitation_get);
+        coap_register_handler(resource_wind_speed, COAP_REQUEST_GET, hnd_wind_speed_get);
+        coap_register_handler(resource_state, COAP_REQUEST_PUT, hnd_state_put);
+        coap_register_handler(resource_monitor, COAP_REQUEST_PUT, hnd_monitor_put);
+        coap_register_handler(resource_anemometer_unit, COAP_REQUEST_PUT, hnd_anemometer_unit_put);
         /* We possibly want to Observe the GETs */
         coap_resource_set_get_observable(resource_Espressif, 1);
         coap_add_resource(ctx, resource_Espressif);
         coap_resource_set_get_observable(resource_feedback, 1);
         coap_add_resource(ctx, resource_feedback);
+        coap_resource_set_get_observable(resource_pollution, 1);
+        coap_add_resource(ctx, resource_pollution);
+        coap_resource_set_get_observable(resource_radiation, 1);
+        coap_add_resource(ctx, resource_radiation);
+        coap_resource_set_get_observable(resource_precipitation, 1);
+        coap_add_resource(ctx, resource_precipitation);
+        coap_resource_set_get_observable(resource_wind_speed, 1);
+        coap_add_resource(ctx, resource_wind_speed);
+        coap_resource_set_get_observable(resource_state, 1);
+        coap_add_resource(ctx, resource_state);
+        coap_resource_set_get_observable(resource_monitor, 1);
+        coap_add_resource(ctx, resource_monitor);
+        coap_resource_set_get_observable(resource_anemometer_unit, 1);
+        coap_add_resource(ctx, resource_anemometer_unit);
 #ifdef CONFIG_COAP_OSCORE_SUPPORT
         resource = coap_resource_init(coap_make_str_const("oscore"), COAP_RESOURCE_FLAGS_OSCORE_ONLY);
         if (!resource) {
