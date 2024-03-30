@@ -38,7 +38,6 @@ def main():
     state_payload = 0
     monitor_payload = 0
     anemometer_unit_payload = 0
-    example_path = "coap://192.168.100.131:5683/Espressif"
     feedback_path = "coap://192.168.100.131:5683/feedback"
     pollution_path = "coap://192.168.100.131:5683/pollution"
     radiation_path = "coap://192.168.100.131:5683/radiation"
