@@ -66,6 +66,7 @@
 */
 #define EXAMPLE_COAP_LOG_DEFAULT_LEVEL CONFIG_COAP_LOG_DEFAULT_LEVEL
 
+#define CONFIG_MDNS_HOSTNAME "esp32-mdns-Noe"
 #define CONFIG_MDNS_INSTANCE "ESP32 with mDNS"
 #define EXAMPLE_MDNS_INSTANCE CONFIG_MDNS_INSTANCE
 #define CONFIG_MDNS_BUTTON_GPIO 0
@@ -96,9 +97,24 @@ static int monitor_data_len = 0;
 static char anemometer_unit_data[100];
 static int anemometer_unit_data_len = 0;
 
+static char *generate_hostname(void)
+{
+#ifndef CONFIG_MDNS_ADD_MAC_TO_HOSTNAME
+    return strdup(CONFIG_MDNS_HOSTNAME);
+#else
+    uint8_t mac[6];
+    char   *hostname;
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    if (-1 == asprintf(&hostname, "%s-%02X%02X%02X", CONFIG_MDNS_HOSTNAME, mac[3], mac[4], mac[5])) {
+        abort();
+    }
+    return hostname;
+#endif
+}
+
 static void initialise_mdns(void)
 {
-    char *hostname = "esp32-mdns-Noe";
+    char *hostname = generate_hostname();
 
     //initialize mDNS
     ESP_ERROR_CHECK( mdns_init() );
@@ -837,6 +853,6 @@ void app_main(void)
     ESP_ERROR_CHECK(example_connect());
     initialise_button();
 
-    xTaskCreate(&mdns_example_task, "mdns_example_task", 2048*6, NULL, 5, NULL);
+    xTaskCreate(&mdns_example_task, "mdns_example_task", 2048*4, NULL, 5, NULL);
     xTaskCreate(coap_example_server, "coap", 8*1024, NULL, 5, NULL);
 }
