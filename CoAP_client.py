@@ -1,9 +1,30 @@
 import socket
 
+from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
+
 from coapthon.client.helperclient import HelperClient
 from coapthon.utils import parse_uri
 
 __author__ = 'Giacomo Tanganelli'
+
+ip = ""
+
+class MyListener(ServiceListener):
+
+    """def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+        print(f"Service {name} updated")
+
+    def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+        print(f"Service {name} removed")"""
+
+    def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+        global ip
+
+        info = zc.get_service_info(type_, name)
+        print(f"Service {name} added, service info: {info}")
+        ip = info.addresses.pop()
+        ip = '.'.join(f'{c}' for c in ip)
+        print("Local ip address found: " + ip)
 
 def get_method(path):
     host, port, path = parse_uri(path)
@@ -38,14 +59,37 @@ def main():
     state_payload = 0
     monitor_payload = 0
     anemometer_unit_payload = 0
-    feedback_path = "coap://192.168.100.131:5683/feedback"
-    pollution_path = "coap://192.168.100.131:5683/pollution"
-    radiation_path = "coap://192.168.100.131:5683/radiation"
-    precipitation_path = "coap://192.168.100.131:5683/precipitation"
-    wind_speed_path = "coap://192.168.100.131:5683/wind_speed"
-    state_path = "coap://192.168.100.131:5683/state"
-    monitor_path = "coap://192.168.100.131:5683/monitor"
-    anemometer_unit_path = "coap://192.168.100.131:5683/anemometer_unit"
+    prefix = "coap://"
+    global ip
+    port = "5683"
+    #feedback_path = "coap://192.168.100.131:5683/feedback"
+    feedback_path = "/feedback"
+    pollution_path = "/pollution"
+    radiation_path = "/radiation"
+    precipitation_path = "/precipitation"
+    wind_speed_path = "/wind_speed"
+    state_path = "/state"
+    monitor_path = "/monitor"
+    anemometer_unit_path = "/anemometer_unit"
+
+    # Get the local ESP32S3 ipv4 address
+    zeroconf = Zeroconf()
+    listener = MyListener()
+    browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
+    try:
+        input("Press enter to exit...\n\n")
+    finally:
+        zeroconf.close()
+
+    # Build the paths with the obtained ip
+    feedback_path = prefix + ip + ":" + port + feedback_path
+    pollution_path = prefix + ip + ":" + port + pollution_path
+    radiation_path = prefix + ip + ":" + port + radiation_path
+    precipitation_path = prefix + ip + ":" + port + precipitation_path
+    wind_speed_path = prefix + ip + ":" + port + wind_speed_path
+    state_path = prefix + ip + ":" + port + state_path
+    monitor_path = prefix + ip + ":" + port + monitor_path
+    anemometer_unit_path = prefix + ip + ":" + port + anemometer_unit_path
 
     while(no_exit):
         print("Choose an option:")
