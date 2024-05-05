@@ -25,6 +25,8 @@
 #define RX_MESSAGE_BUFFER_NUM      (9)
 #define TX_MESSAGE_BUFFER_NUM      (8)
 #define DLC                        (8)
+#define LED_ON					   	0x1000000
+#define LED_OFF						0x0
 
 /* Fix MISRA_C-2012 Rule 17.7. */
 #define LOG_INFO (void)PRINTF
@@ -33,10 +35,26 @@
  ******************************************************************************/
 
 /*******************************************************************************
- * Variables
+ * Global variables
  ******************************************************************************/
 volatile bool rxComplete = false;
 flexcan_frame_t txFrame, rxFrame;
+
+/*******************************************************************************
+ * Interruptions
+ ******************************************************************************/
+void BOARD_SW3_IRQ_HANDLER(void){
+    GPIO_PortClearInterruptFlags(BOARD_SW3_GPIO, 1U << BOARD_SW3_GPIO_PIN);
+    PRINTF("SW3\r\n");
+    SDK_ISR_EXIT_BARRIER;
+}
+
+void BOARD_SW2_IRQ_HANDLER(void){
+    GPIO_PortClearInterruptFlags(BOARD_SW2_GPIO, 1U << BOARD_SW2_GPIO_PIN);
+    PRINTF("SW2\r\n");
+    SDK_ISR_EXIT_BARRIER;
+}
+
 
 /*******************************************************************************
  * Code
@@ -80,11 +98,22 @@ int main(void)
     BOARD_InitBootClocks();
     BOARD_InitDebugConsole();
 
+    /* Init SW3 GPIO */
+	PORT_SetPinInterruptConfig(BOARD_SW3_PORT, BOARD_SW3_GPIO_PIN, kPORT_InterruptFallingEdge);
+	EnableIRQ(BOARD_SW3_IRQ);
+	GPIO_PinInit(BOARD_SW3_GPIO, BOARD_SW3_GPIO_PIN, &sw_config);
+
+	/* Init SW2 GPIO */
+  	PORT_SetPinInterruptConfig(BOARD_SW2_PORT, BOARD_SW2_GPIO_PIN, kPORT_InterruptFallingEdge);
+	EnableIRQ(BOARD_SW2_IRQ);
+	GPIO_PinInit(BOARD_SW2_GPIO, BOARD_SW2_GPIO_PIN, &sw_config);
+
     /* Init output LEDs GPIO */
 	GPIO_PinInit(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, &led_config);
 	GPIO_PinInit(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, &led_config);
 	GPIO_PinInit(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, &led_config);
 
+	/* Turn off all LEDs */
 	GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
 	GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
 	GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
@@ -106,14 +135,10 @@ int main(void)
      */
     FLEXCAN_GetDefaultConfig(&flexcanConfig);
 
-#if defined(EXAMPLE_CAN_CLK_SOURCE)
     flexcanConfig.clkSrc = EXAMPLE_CAN_CLK_SOURCE;
-#endif
 
     //flexcanConfig.enableLoopBack = true;
     flexcanConfig.baudRate             = 125000U;
-
-#if (defined(USE_IMPROVED_TIMING_CONFIG) && USE_IMPROVED_TIMING_CONFIG)
     flexcan_timing_config_t timing_config;
     memset(&timing_config, 0, sizeof(flexcan_timing_config_t));
     if (FLEXCAN_CalculateImprovedTimingValues(EXAMPLE_CAN, flexcanConfig.baudRate, EXAMPLE_CAN_CLK_FREQ,
@@ -126,7 +151,6 @@ int main(void)
     {
         LOG_INFO("No found Improved Timing Configuration. Just used default configuration\r\n\r\n");
     }
-#endif
 
     FLEXCAN_Init(EXAMPLE_CAN, &flexcanConfig, EXAMPLE_CAN_CLK_FREQ);
 
@@ -161,25 +185,27 @@ int main(void)
     /* Send data through Tx Message Buffer using polling function. */
     (void)FLEXCAN_TransferSendBlocking(EXAMPLE_CAN, TX_MESSAGE_BUFFER_NUM, &txFrame);
 
-    /* Waiting for Message receive finish. */
-    while (!rxComplete)
-    {
-    }
+    while(1){
+		/* Waiting for Message receive finish. */
+		while (!rxComplete)
+		{
+		}
 
-    if(rxFrame.dataWord0 == 0x1000000){
-    	GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
-    }
+		if(rxFrame.dataWord0 == LED_ON){
+			GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+		}
+		else if(rxFrame.dataWord0 == LED_OFF){
+			GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+		}
 
-    LOG_INFO("\r\nReceived message from MB%d\r\n", RX_MESSAGE_BUFFER_NUM);
-    LOG_INFO("rx word0 = 0x%x\r\n", rxFrame.dataWord0);
-    LOG_INFO("rx word1 = 0x%x\r\n", rxFrame.dataWord1);
+		LOG_INFO("\r\nReceived message from MB%d\r\n", RX_MESSAGE_BUFFER_NUM);
+		LOG_INFO("rx word0 = 0x%x\r\n", rxFrame.dataWord0);
+		LOG_INFO("rx word1 = 0x%x\r\n", rxFrame.dataWord1);
+
+	}
 
     /* Stop FlexCAN Send & Receive. */
     FLEXCAN_DisableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_NUM);
 
     LOG_INFO("\r\n==FlexCAN loopback functional example -- Finish.==\r\n");
-
-    while (true)
-    {
-    }
 }

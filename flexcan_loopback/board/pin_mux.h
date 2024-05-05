@@ -41,6 +41,14 @@ void BOARD_InitBootPins(void);
  */
 void BOARD_InitPins(void);
 
+#define BOARD_SW2_GPIO GPIOC /*!<@brief GPIO device name: GPIOC */
+#define BOARD_SW2_PORT PORTC /*!<@brief PORT device name: PORTC */
+#define BOARD_SW2_PIN 6U     /*!<@brief PORTC pin index: 6 */
+
+#define BOARD_SW3_GPIO GPIOA /*!<@brief GPIO device name: GPIOA */
+#define BOARD_SW3_PORT PORTA /*!<@brief PORT device name: PORTA */
+#define BOARD_SW3_PIN 4U     /*!<@brief PORTA pin index: 4 */
+
 #if defined(__cplusplus)
 }
 #endif
