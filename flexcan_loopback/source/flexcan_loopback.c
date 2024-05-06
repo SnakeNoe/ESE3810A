@@ -26,8 +26,6 @@
 #define RX_MESSAGE_BUFFER_0x11     (10)
 #define TX_MESSAGE_BUFFER_NUM      (8)
 #define DLC                        (2)
-#define LED_ON					   	1
-#define LED_OFF						0
 #define MAX_VAL_UINT12				4095
 #define MIN_VAL_UINT12				0
 #define STEP						200
@@ -199,20 +197,69 @@ int main(void)
     txFrame.length = (uint8_t)DLC;
 
     while(1){
-    	/* led0 signal */
+    	/* leds_values message */
 		if(id == 0x10){
 			changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
 			PRINTF("\r\nReceived message leds_values (0x10)\r\n");
-			PRINTF("led0 = 0x%x\r\n", rxFrame.dataByte3);
-			if(rxFrame.dataWord0 == LED_ON){
-				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
-			}
-			else if(rxFrame.dataWord0 == LED_OFF){
+			PRINTF("led0 = 0x%x\r\n", rxFrame.dataWord0);
+			switch(rxFrame.dataByte3){
+			/* All LEDs off */
+			case 0:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
 				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
+				break;
+			/* Green LED */
+			case 1:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
+				break;
+			/* Blue LED */
+			case 2:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 0);
+				break;
+			/* Green and blue LEDs */
+			case 3:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 0);
+				break;
+			/* Red LED */
+			case 4:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
+				break;
+			/* Green and red LEDs */
+			case 5:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
+				break;
+			/* Blue and red LEDs */
+			case 6:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 0);
+				break;
+			/* Green, blue and red LEDs */
+			case 7:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 0);
+				break;
+			default:
+				GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+				GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
+				break;
 			}
 			id = 0;
 		}
-		/* period0 signal */
+		/* periods_setting message */
 		else if(id == 0x11){
 			changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
 			PRINTF("\r\nReceived message periods_setting (0x11)\r\n");
@@ -230,24 +277,24 @@ int main(void)
 		else{
 			delay(period);
 			switch(adcStatus){
-				case 1:
-					if((adc + STEP) > MAX_VAL_UINT12){
-						adc = MAX_VAL_UINT12;
-					}
-					else{
-						adc += STEP;
-					}
-					adcStatus = 0;
-					break;
-				case 2:
-					if((adc - STEP) < MIN_VAL_UINT12){
-						adc = MIN_VAL_UINT12;
-					}
-					else{
-						adc -= STEP;
-					}
-					adcStatus = 0;
-					break;
+			case 1:
+				if((adc + STEP) > MAX_VAL_UINT12){
+					adc = MAX_VAL_UINT12;
+				}
+				else{
+					adc += STEP;
+				}
+				adcStatus = 0;
+				break;
+			case 2:
+				if((adc - STEP) < MIN_VAL_UINT12){
+					adc = MIN_VAL_UINT12;
+				}
+				else{
+					adc -= STEP;
+				}
+				adcStatus = 0;
+				break;
 			}
 			PRINTF("\r\nSend message ecu1_stats (0x20)\r\n");
 			txFrame.dataByte0 = (adc & 0x00FF);
