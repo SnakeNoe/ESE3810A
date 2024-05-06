@@ -25,9 +25,12 @@
 #define RX_MESSAGE_BUFFER_0x10     (9)
 #define RX_MESSAGE_BUFFER_0x11     (10)
 #define TX_MESSAGE_BUFFER_NUM      (8)
-#define DLC                        (8)
+#define DLC                        (2)
 #define LED_ON					   	1
 #define LED_OFF						0
+#define MAX_VAL_UINT12				4095
+#define MIN_VAL_UINT12				0
+#define STEP						200
 
 /* Fix MISRA_C-2012 Rule 17.7. */
 #define LOG_INFO (void)PRINTF
@@ -42,19 +45,20 @@ void delay(uint32_t seconds);
  ******************************************************************************/
 flexcan_frame_t txFrame, rxFrame;
 volatile uint8_t id = 0;
+volatile uint8_t adcStatus = 0;		//0=Nothing, 1=Increment, 2=Decrement
 
 /*******************************************************************************
  * Interruptions
  ******************************************************************************/
 void BOARD_SW3_IRQ_HANDLER(void){
     GPIO_PortClearInterruptFlags(BOARD_SW3_GPIO, 1U << BOARD_SW3_GPIO_PIN);
-
+    adcStatus = 2;
     SDK_ISR_EXIT_BARRIER;
 }
 
 void BOARD_SW2_IRQ_HANDLER(void){
     GPIO_PortClearInterruptFlags(BOARD_SW2_GPIO, 1U << BOARD_SW2_GPIO_PIN);
-
+    adcStatus = 1;
     SDK_ISR_EXIT_BARRIER;
 }
 
@@ -91,6 +95,8 @@ int main(void)
     flexcan_rx_mb_config_t mbConfig;
     flexcan_rx_mb_config_t mbConfig1;
     uint32_t flag = 1U;
+    uint8_t period = 1;
+    uint16_t adc = 0;
 
 	/* Define the init structure for the input switch pin */
 	gpio_pin_config_t sw_config = {
@@ -191,17 +197,6 @@ int main(void)
     txFrame.type   = (uint8_t)kFLEXCAN_FrameTypeData;
     txFrame.id     = FLEXCAN_ID_STD(0x20);
     txFrame.length = (uint8_t)DLC;
-    txFrame.dataWord0 = CAN_WORD0_DATA_BYTE_0(0x11) | CAN_WORD0_DATA_BYTE_1(0x22) | CAN_WORD0_DATA_BYTE_2(0x33) |
-                        CAN_WORD0_DATA_BYTE_3(0x44);
-    txFrame.dataWord1 = CAN_WORD1_DATA_BYTE_4(0x55) | CAN_WORD1_DATA_BYTE_5(0x66) | CAN_WORD1_DATA_BYTE_6(0x77) |
-                        CAN_WORD1_DATA_BYTE_7(0x88);
-
-    LOG_INFO("Send message from MB%d to MB%d\r\n", TX_MESSAGE_BUFFER_NUM, RX_MESSAGE_BUFFER_0x10);
-    LOG_INFO("tx word0 = 0x%x\r\n", txFrame.dataWord0);
-    LOG_INFO("tx word1 = 0x%x\r\n", txFrame.dataWord1);
-
-    /* Send data through Tx Message Buffer using polling function. */
-    (void)FLEXCAN_TransferSendBlocking(EXAMPLE_CAN, TX_MESSAGE_BUFFER_NUM, &txFrame);
 
     while(1){
     	/* led0 signal */
@@ -222,11 +217,43 @@ int main(void)
 			changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
 			PRINTF("\r\nReceived message periods_setting (0x11)\r\n");
 			PRINTF("period0 = 0x%x\r\n", rxFrame.dataByte3);
-			PRINTF("New period = 0x%ds\r\n", rxFrame.dataByte3);
+			if((rxFrame.dataByte3 * 0.1) < 1){
+				period = 1;
+			}
+			else{
+				period = (uint8_t)(rxFrame.dataByte3 * 0.1);
+			}
+			PRINTF("New period = %ds\r\n", period);
 			id = 0;
 		}
+		/* Transmit signals adc0 */
 		else{
-			delay(5);
+			delay(period);
+			switch(adcStatus){
+				case 1:
+					if((adc + STEP) > MAX_VAL_UINT12){
+						adc = MAX_VAL_UINT12;
+					}
+					else{
+						adc += STEP;
+					}
+					adcStatus = 0;
+					break;
+				case 2:
+					if((adc - STEP) < MIN_VAL_UINT12){
+						adc = MIN_VAL_UINT12;
+					}
+					else{
+						adc -= STEP;
+					}
+					adcStatus = 0;
+					break;
+			}
+			PRINTF("\r\nSend message ecu1_stats (0x20)\r\n");
+			txFrame.dataByte0 = (adc & 0x00FF);
+			txFrame.dataByte1 = (adc & 0xFF00) >> 8;
+			PRINTF("adc0 = %d\r\n", adc);
+			(void)FLEXCAN_TransferSendBlocking(EXAMPLE_CAN, TX_MESSAGE_BUFFER_NUM, &txFrame);
 		}
 	}
     /* Stop FlexCAN Send & Receive. */
