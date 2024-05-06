@@ -25,14 +25,15 @@
 #define RX_MESSAGE_BUFFER_NUM      (9)
 #define TX_MESSAGE_BUFFER_NUM      (8)
 #define DLC                        (8)
-#define LED_ON					   	0x1000000
-#define LED_OFF						0x0
+#define LED_ON					   	1
+#define LED_OFF						0
 
 /* Fix MISRA_C-2012 Rule 17.7. */
 #define LOG_INFO (void)PRINTF
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
+void changeEndianess(uint32_t *word0, uint32_t *word1);
 
 /*******************************************************************************
  * Global variables
@@ -191,6 +192,8 @@ int main(void)
 		{
 		}
 
+		changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
+
 		if(rxFrame.dataWord0 == LED_ON){
 			GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
 		}
@@ -201,11 +204,26 @@ int main(void)
 		LOG_INFO("\r\nReceived message from MB%d\r\n", RX_MESSAGE_BUFFER_NUM);
 		LOG_INFO("rx word0 = 0x%x\r\n", rxFrame.dataWord0);
 		LOG_INFO("rx word1 = 0x%x\r\n", rxFrame.dataWord1);
-
+		rxComplete = false;
 	}
-
     /* Stop FlexCAN Send & Receive. */
     FLEXCAN_DisableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_NUM);
 
     LOG_INFO("\r\n==FlexCAN loopback functional example -- Finish.==\r\n");
+}
+
+void changeEndianess(uint32_t *word0, uint32_t *word1){
+	uint32_t tempWord;
+
+	tempWord = (*word0 & 0xFF000000) >> 24;
+	tempWord = (tempWord | (*word0 & 0x00FF0000) >> 8);
+	tempWord = (tempWord | (*word0 & 0x0000FF00) << 8);
+	tempWord = (tempWord | (*word0 & 0x000000FF) << 24);
+	*word0 = tempWord;
+
+	tempWord = (*word1 & 0xFF000000) >> 24;
+	tempWord = (tempWord | (*word1 & 0x00FF0000) >> 8);
+	tempWord = (tempWord | (*word1 & 0x0000FF00) << 8);
+	tempWord = (tempWord | (*word1 & 0x000000FF) << 24);
+	*word1 = tempWord;
 }
