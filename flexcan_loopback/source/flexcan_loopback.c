@@ -22,7 +22,8 @@
 #define USE_IMPROVED_TIMING_CONFIG (1U)
 #define EXAMPLE_FLEXCAN_IRQn       CAN0_ORed_Message_buffer_IRQn
 #define EXAMPLE_FLEXCAN_IRQHandler CAN0_ORed_Message_buffer_IRQHandler
-#define RX_MESSAGE_BUFFER_NUM      (9)
+#define RX_MESSAGE_BUFFER_0x10     (9)
+#define RX_MESSAGE_BUFFER_0x11     (10)
 #define TX_MESSAGE_BUFFER_NUM      (8)
 #define DLC                        (8)
 #define LED_ON					   	1
@@ -34,25 +35,26 @@
  * Prototypes
  ******************************************************************************/
 void changeEndianess(uint32_t *word0, uint32_t *word1);
+void delay(uint32_t seconds);
 
 /*******************************************************************************
  * Global variables
  ******************************************************************************/
-volatile bool rxComplete = false;
 flexcan_frame_t txFrame, rxFrame;
+volatile uint8_t id = 0;
 
 /*******************************************************************************
  * Interruptions
  ******************************************************************************/
 void BOARD_SW3_IRQ_HANDLER(void){
     GPIO_PortClearInterruptFlags(BOARD_SW3_GPIO, 1U << BOARD_SW3_GPIO_PIN);
-    PRINTF("SW3\r\n");
+
     SDK_ISR_EXIT_BARRIER;
 }
 
 void BOARD_SW2_IRQ_HANDLER(void){
     GPIO_PortClearInterruptFlags(BOARD_SW2_GPIO, 1U << BOARD_SW2_GPIO_PIN);
-    PRINTF("SW2\r\n");
+
     SDK_ISR_EXIT_BARRIER;
 }
 
@@ -65,12 +67,18 @@ void EXAMPLE_FLEXCAN_IRQHandler(void)
 {
     uint32_t flag = 1U;
     /* If new data arrived. */
-    if (0U != FLEXCAN_GetMbStatusFlags(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_NUM))
+    if (0U != FLEXCAN_GetMbStatusFlags(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x10))
     {
-        FLEXCAN_ClearMbStatusFlags(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_NUM);
-        (void)FLEXCAN_ReadRxMb(EXAMPLE_CAN, RX_MESSAGE_BUFFER_NUM, &rxFrame);
-        rxComplete = true;
+    	id = 0x10;
+        FLEXCAN_ClearMbStatusFlags(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x10);
+        (void)FLEXCAN_ReadRxMb(EXAMPLE_CAN, RX_MESSAGE_BUFFER_0x10, &rxFrame);
     }
+    if (0U != FLEXCAN_GetMbStatusFlags(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x11))
+	{
+    	id = 0x11;
+		FLEXCAN_ClearMbStatusFlags(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x11);
+		(void)FLEXCAN_ReadRxMb(EXAMPLE_CAN, RX_MESSAGE_BUFFER_0x11, &rxFrame);
+	}
     SDK_ISR_EXIT_BARRIER;
 }
 
@@ -81,6 +89,7 @@ int main(void)
 {
     flexcan_config_t flexcanConfig;
     flexcan_rx_mb_config_t mbConfig;
+    flexcan_rx_mb_config_t mbConfig1;
     uint32_t flag = 1U;
 
 	/* Define the init structure for the input switch pin */
@@ -160,13 +169,21 @@ int main(void)
     mbConfig.type   = kFLEXCAN_FrameTypeData;
     mbConfig.id     = FLEXCAN_ID_STD(0x10);
 
-    FLEXCAN_SetRxMbConfig(EXAMPLE_CAN, RX_MESSAGE_BUFFER_NUM, &mbConfig, true);
+    FLEXCAN_SetRxMbConfig(EXAMPLE_CAN, RX_MESSAGE_BUFFER_0x10, &mbConfig, true);
+
+    /* Setup Rx Message Buffer. */
+	mbConfig1.format = kFLEXCAN_FrameFormatStandard;
+	mbConfig1.type   = kFLEXCAN_FrameTypeData;
+	mbConfig1.id     = FLEXCAN_ID_STD(0x11);
+
+	FLEXCAN_SetRxMbConfig(EXAMPLE_CAN, RX_MESSAGE_BUFFER_0x11, &mbConfig1, true);
 
     /* Setup Tx Message Buffer. */
     FLEXCAN_SetTxMbConfig(EXAMPLE_CAN, TX_MESSAGE_BUFFER_NUM, true);
 
     /* Enable Rx Message Buffer interrupt. */
-    FLEXCAN_EnableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_NUM);
+    FLEXCAN_EnableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x10);
+    FLEXCAN_EnableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x11);
     (void)EnableIRQ(EXAMPLE_FLEXCAN_IRQn);
 
     /* Prepare Tx Frame for sending. */
@@ -179,7 +196,7 @@ int main(void)
     txFrame.dataWord1 = CAN_WORD1_DATA_BYTE_4(0x55) | CAN_WORD1_DATA_BYTE_5(0x66) | CAN_WORD1_DATA_BYTE_6(0x77) |
                         CAN_WORD1_DATA_BYTE_7(0x88);
 
-    LOG_INFO("Send message from MB%d to MB%d\r\n", TX_MESSAGE_BUFFER_NUM, RX_MESSAGE_BUFFER_NUM);
+    LOG_INFO("Send message from MB%d to MB%d\r\n", TX_MESSAGE_BUFFER_NUM, RX_MESSAGE_BUFFER_0x10);
     LOG_INFO("tx word0 = 0x%x\r\n", txFrame.dataWord0);
     LOG_INFO("tx word1 = 0x%x\r\n", txFrame.dataWord1);
 
@@ -187,27 +204,34 @@ int main(void)
     (void)FLEXCAN_TransferSendBlocking(EXAMPLE_CAN, TX_MESSAGE_BUFFER_NUM, &txFrame);
 
     while(1){
-		/* Waiting for Message receive finish. */
-		while (!rxComplete)
-		{
+    	/* led0 signal */
+		if(id == 0x10){
+			changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
+			PRINTF("\r\nReceived message leds_values (0x10)\r\n");
+			PRINTF("led0 = 0x%x\r\n", rxFrame.dataByte3);
+			if(rxFrame.dataWord0 == LED_ON){
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+			}
+			else if(rxFrame.dataWord0 == LED_OFF){
+				GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+			}
+			id = 0;
 		}
-
-		changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
-
-		if(rxFrame.dataWord0 == LED_ON){
-			GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 0);
+		/* period0 signal */
+		else if(id == 0x11){
+			changeEndianess(&rxFrame.dataWord0, &rxFrame.dataWord1);
+			PRINTF("\r\nReceived message periods_setting (0x11)\r\n");
+			PRINTF("period0 = 0x%x\r\n", rxFrame.dataByte3);
+			PRINTF("New period = 0x%ds\r\n", rxFrame.dataByte3);
+			id = 0;
 		}
-		else if(rxFrame.dataWord0 == LED_OFF){
-			GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+		else{
+			delay(5);
 		}
-
-		LOG_INFO("\r\nReceived message from MB%d\r\n", RX_MESSAGE_BUFFER_NUM);
-		LOG_INFO("rx word0 = 0x%x\r\n", rxFrame.dataWord0);
-		LOG_INFO("rx word1 = 0x%x\r\n", rxFrame.dataWord1);
-		rxComplete = false;
 	}
     /* Stop FlexCAN Send & Receive. */
-    FLEXCAN_DisableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_NUM);
+    FLEXCAN_DisableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x10);
+    FLEXCAN_DisableMbInterrupts(EXAMPLE_CAN, flag << RX_MESSAGE_BUFFER_0x11);
 
     LOG_INFO("\r\n==FlexCAN loopback functional example -- Finish.==\r\n");
 }
@@ -226,4 +250,10 @@ void changeEndianess(uint32_t *word0, uint32_t *word1){
 	tempWord = (tempWord | (*word1 & 0x0000FF00) << 8);
 	tempWord = (tempWord | (*word1 & 0x000000FF) << 24);
 	*word1 = tempWord;
+}
+
+void delay(uint32_t seconds){
+	for(uint32_t i=11000000*seconds;i>0;i--){
+		;
+	}
 }
