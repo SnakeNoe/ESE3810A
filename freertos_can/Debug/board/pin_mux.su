@@ -1,0 +1,7 @@
+C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\freertos_can\drivers/fsl_clock.h:668:20:CLOCK_EnableClock	24	static
+C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\freertos_can\drivers/fsl_port.h:271:20:PORT_SetPinConfig	32	static
+C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\freertos_can\drivers/fsl_port.h:374:20:PORT_SetPinMux	24	static
+C:\Users\noe_9\Documents\MCUXpressoIDE_11.8.0_1165\workspace\freertos_can\drivers/fsl_port.h:443:20:PORT_SetPinInterruptConfig	24	static
+../board/pin_mux.c:38:6:BOARD_InitBootPins	8	static
+../board/pin_mux.c:61:6:BOARD_InitPins	16	static
+../board/pin_mux.c:135:6:BOARD_InitButtonsPins	24	static
