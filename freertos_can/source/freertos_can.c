@@ -73,11 +73,13 @@ void EXAMPLE_FLEXCAN_IRQHandler(void)
     {
         FLEXCAN_ClearMbStatusFlags(EXAMPLE_CAN, FLAG << RX_MESSAGE_BUFFER_0x10);
         (void)FLEXCAN_ReadRxMb(EXAMPLE_CAN, RX_MESSAGE_BUFFER_0x10, &rxFrame);
+        rxFrame.id = 0x10;
     }
     if (0U != FLEXCAN_GetMbStatusFlags(EXAMPLE_CAN, FLAG << RX_MESSAGE_BUFFER_0x11))
 	{
 		FLEXCAN_ClearMbStatusFlags(EXAMPLE_CAN, FLAG << RX_MESSAGE_BUFFER_0x11);
 		(void)FLEXCAN_ReadRxMb(EXAMPLE_CAN, RX_MESSAGE_BUFFER_0x11, &rxFrame);
+		rxFrame.id = 0x11;
 	}
     xQueueSendFromISR(log_queue, (void *)&rxFrame, 0);
 
@@ -118,6 +120,17 @@ int main(void)
     BOARD_InitBootPins();
     BOARD_InitBootClocks();
     BOARD_InitDebugConsole();
+
+    /* Init output LEDs GPIO */
+	GPIO_PinInit(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, &led_config);
+	GPIO_PinInit(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, &led_config);
+	GPIO_PinInit(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, &led_config);
+
+	/* Turn off all LEDs */
+	GPIO_PinWrite(BOARD_LED_RED_GPIO, BOARD_LED_RED_GPIO_PIN, 1);
+	GPIO_PinWrite(BOARD_LED_GREEN_GPIO, BOARD_LED_GREEN_GPIO_PIN, 1);
+	GPIO_PinWrite(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, 1);
+
     can_init();
 
     if (xTaskCreate(can_tx_task, "CAN_Tx_task", configMINIMAL_STACK_SIZE + 100, NULL, can_tx_task_PRIORITY, NULL) !=
@@ -162,10 +175,11 @@ static void can_rx_task(void *pvParameters)
     for (;;){
     	xQueueReceive(log_queue, &localBuffer, portMAX_DELAY);
     	changeEndianess(&localBuffer.dataWord0, &localBuffer.dataWord1);
-    	PRINTF("ID: 0x%x\r\n", FLEXCAN_ID_STD(localBuffer.id));
-    	PRINTF("Data: 0x%x\r\n", localBuffer.dataWord0);
 
-        //vTaskSuspend(NULL);
+    	switch(localBuffer.id){
+    	case 0x10:
+    		break;
+    	}
     }
 }
 
