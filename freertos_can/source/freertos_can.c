@@ -40,6 +40,8 @@
 #define STEP						200
 #define FLAG						1U
 #define QUEUE_ITEMS					10
+#define MAX_VAL_UINT12				4095
+#define STEP						200
 
 /* Fix MISRA_C-2012 Rule 17.7. */
 #define LOG_INFO (void)PRINTF
@@ -154,17 +156,20 @@ int main(void)
 
 static void can_tx_task(void *pvParameters)
 {
+	static uint16_t temp = 0;
     for (;;){
-    	PRINTF("Tx\r\n");
-    	/* Prepare Tx Frame for sending. */
-		txFrame.format = (uint8_t)kFLEXCAN_FrameFormatStandard;
-		txFrame.type   = (uint8_t)kFLEXCAN_FrameTypeData;
-		txFrame.id     = FLEXCAN_ID_STD(0x20);
-		txFrame.length = (uint8_t)DLC;
+    	PRINTF("\r\nSend message ecu1_stats (0x20)\r\n");
+    	PRINTF("adc0 = %d\r\n", temp);
+    	(void)FLEXCAN_TransferSendBlocking(EXAMPLE_CAN, TX_MESSAGE_BUFFER_NUM, &txFrame);
+    	if((temp + STEP) > MAX_VAL_UINT12){
+			temp = 0;
+		}
+		else{
+			temp += STEP;
+		}
+		txFrame.dataByte0 = (temp & 0x00FF);
+		txFrame.dataByte1 = (temp & 0xFF00) >> 8;
 		vTaskDelay(period);
-
-
-        //vTaskSuspend(NULL);
     }
 }
 
@@ -177,6 +182,8 @@ static void can_rx_task(void *pvParameters)
     	changeEndianess(&localBuffer.dataWord0, &localBuffer.dataWord1);
 
     	if(localBuffer.id == 0x10){
+    		PRINTF("\r\nReceived message leds_values (0x10)\r\n");
+    		PRINTF("led0 = 0x%x\r\n", localBuffer.dataWord0);
     		switch(localBuffer.dataByte3){
 			/* All LEDs off */
 			case 0:
@@ -234,7 +241,15 @@ static void can_rx_task(void *pvParameters)
 			}
     	}
     	else if(localBuffer.id == 0x11){
-    		period = (localBuffer.dataWord0 * 200);
+    		PRINTF("\r\nReceived message periods_setting (0x11)\r\n");
+    		PRINTF("period0 = 0x%x\r\n", localBuffer.dataWord0);
+    		if((localBuffer.dataWord0 * 20) < 200){
+    			period = 200;
+    		}
+    		else{
+    			period = (uint16_t)(localBuffer.dataWord0 * 20);
+    		}
+    		PRINTF("New period = %ds\r\n", (uint16_t)((period * 0.01) / 2));
     	}
     }
 }
@@ -301,6 +316,12 @@ void can_init(){
 	FLEXCAN_EnableMbInterrupts(EXAMPLE_CAN, FLAG << RX_MESSAGE_BUFFER_0x10);
 	FLEXCAN_EnableMbInterrupts(EXAMPLE_CAN, FLAG << RX_MESSAGE_BUFFER_0x11);
 	(void)EnableIRQ(EXAMPLE_FLEXCAN_IRQn);
+
+	/* Prepare Tx Frame for sending. */
+	txFrame.format = (uint8_t)kFLEXCAN_FrameFormatStandard;
+	txFrame.type   = (uint8_t)kFLEXCAN_FrameTypeData;
+	txFrame.id     = FLEXCAN_ID_STD(0x20);
+	txFrame.length = (uint8_t)DLC;
 }
 
 void changeEndianess(uint32_t *word0, uint32_t *word1){
